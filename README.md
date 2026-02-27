@@ -19,7 +19,9 @@ api/ (Cloudflare Workers)
 ### Prerequisites
 - [Node.js](https://nodejs.org/)
 - [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier is enough)
+- [Vercel account](https://vercel.com/signup) (free tier is enough)
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/): `npm install -g wrangler && wrangler login`
+- [Vercel CLI](https://vercel.com/docs/cli): `npm install -g vercel && vercel login`
 
 ### Run the setup script
 
@@ -27,17 +29,33 @@ api/ (Cloudflare Workers)
 node scripts/setup.js
 ```
 
-The script will:
+The script handles the full deployment end-to-end:
 - Create a D1 database and R2 bucket in your Cloudflare account
 - Update `api/wrangler.toml` with the generated IDs
 - Apply the database schema
-- Prompt for admin credentials and set all secrets
+- Prompt for admin credentials and set all Cloudflare secrets
 - Deploy the Worker
-- Write `admin/.env.local` with your Worker URL
+- Deploy the admin UI to Vercel
+- Set `NEXT_PUBLIC_API_URL` on the Vercel project and redeploy
+- Update `CORS_ORIGINS` with the Vercel URL and redeploy the Worker
 
-The one manual step is enabling public access on your R2 bucket — the script will pause and tell you exactly where to do it.
+The one manual step is enabling public access on your R2 bucket — the script will pause and tell you exactly where to do it. On first Vercel deploy you may also be prompted to select your account.
 
-After the script completes, deploy `admin/` to Vercel and add your Vercel URL to `CORS_ORIGINS` in `api/wrangler.toml`, then redeploy.
+#### Options
+
+**`--prefix`** — Namespaces all Cloudflare resources so multiple instances can coexist on the same account. Useful if you're deploying Pebble for more than one site.
+
+```bash
+node scripts/setup.js --prefix=my-site
+# creates: my-site-cms-api, my-site-cms-db, my-site-cms-images
+```
+
+**`--dry-run`** — Walks through the full setup flow without creating anything. Prompts for resource names, checks Wrangler auth, and prints every command that would run and every file that would be written.
+
+```bash
+node scripts/setup.js --dry-run
+node scripts/setup.js --dry-run --prefix=my-site
+```
 
 ---
 
