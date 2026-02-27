@@ -1,0 +1,16 @@
+name = "blog-api"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+
+[vars]
+CORS_ORIGINS = "https://your-app.vercel.app,http://localhost:3001"
+R2_PUBLIC_URL = "https://pub-YOUR_R2_BUCKET_ID.r2.dev"
+
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "your-r2-bucket-name"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "your-d1-database-name"
+database_id = "your-d1-database-id"

@@ -1,12 +1,14 @@
-# Pebble
+# Blog Service Architecture Wiki
 
-A minimalist, self-hosted blog CMS built on serverless infrastructure. Runs entirely on free tiers.
+## Overview
+
+A headless blog platform built entirely on serverless infrastructure. The system consists of a Cloudflare Workers API, a Next.js admin dashboard, and a public-facing blog (TBD). All infrastructure runs at $0/month on free tiers.
 
 ```
-admin/ (Vercel)
+blog-admin-ui (Vercel)
        │
        ▼
-api/ (Cloudflare Workers)
+blog-api-workers (Cloudflare Workers)
        │
        ├──▶ D1 (Cloudflare SQLite database)
        └──▶ R2 (Cloudflare object storage)
@@ -14,68 +16,31 @@ api/ (Cloudflare Workers)
 
 ---
 
-## Getting started
+## Repositories
 
-### Prerequisites
-- [Node.js](https://nodejs.org/)
-- [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier is enough)
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/): `npm install -g wrangler && wrangler login`
-
-### 1. Create Cloudflare resources
-
-In your Cloudflare dashboard (or via Wrangler), create:
-- A **D1 database** — copy the database name and ID into `api/wrangler.toml`
-- An **R2 bucket** — copy the bucket name and public URL into `api/wrangler.toml`
-
-### 2. Set up the API
-
-```bash
-cd api
-npm install
-
-# Apply schema to your D1 database
-npx wrangler d1 execute your-d1-database-name --remote --file=schema.sql
-
-# Generate a password hash for your admin account
-node scripts/hash-password.js yourpassword
-
-# Set production secrets
-npx wrangler secret put JWT_SECRET
-npx wrangler secret put ADMIN_USERNAME
-npx wrangler secret put ADMIN_PASSWORD_HASH
-
-# Deploy
-npx wrangler deploy
-```
-
-### 3. Set up the admin
-
-```bash
-cd admin
-npm install
-
-# Copy example env file and set your API URL
-cp .env.local.example .env.local
-```
-
-Then set `NEXT_PUBLIC_API_URL` to your deployed Worker URL in `.env.local`, and deploy to Vercel (see [admin deployment](#deployment-1)).
+| Repo | Purpose | Status |
+|---|---|---|
+| `blog-api-workers` | REST API (Cloudflare Workers) | Live |
+| `blog-admin-ui` | Admin dashboard (Next.js) | Live |
+| `blog-api` | Original Express API | Deprecated (kept for reference) |
+| `blog-ui` | Test frontend (Next.js) | Test only |
 
 ---
 
-## Overview
+## Infrastructure
 
-Pebble is a headless blog CMS with two components:
-
-| Directory | Purpose |
-|---|---|
-| `api/` | REST API (Cloudflare Workers + Hono) |
-| `admin/` | Admin dashboard (Next.js) |
+| Service | Provider | URL | Cost |
+|---|---|---|---|
+| API | Cloudflare Workers | `https://blog-api.abhinav-velaga.workers.dev` | Free |
+| Database | Cloudflare D1 (SQLite) | — | Free |
+| Image storage | Cloudflare R2 | `https://pub-b37d0a769e6c424fb7e7693dca4e9c4e.r2.dev` | Free |
+| Admin UI | Vercel | `https://admin.abhi.work` | Free |
 
 ---
 
-## api/
+## blog-api-workers
 
-The core backend. A Cloudflare Worker built with [Hono](https://hono.dev/).
+The core backend. A Cloudflare Worker written with the [Hono](https://hono.dev/) framework.
 
 ### Stack
 - **Runtime**: Cloudflare Workers (V8 isolates, no Node.js)
@@ -86,11 +51,11 @@ The core backend. A Cloudflare Worker built with [Hono](https://hono.dev/).
 
 ### Project structure
 ```
-api/
+blog-api-workers/
 ├── wrangler.toml              # Cloudflare config, bindings, vars
 ├── schema.sql                 # D1 database schema
 ├── scripts/
-│   └── hash-password.js       # Utility to generate bcrypt hashes
+│   └── hash-password.js       # Local utility to generate bcrypt hashes
 └── src/
     ├── index.js               # Hono app, middleware, route mounting
     ├── routes/
@@ -170,7 +135,7 @@ api/
 
 **Response:**
 ```json
-{ "url": "https://<your-r2-public-url>/filename.jpg" }
+{ "url": "https://pub-xxx.r2.dev/filename.jpg" }
 ```
 
 #### Health
@@ -180,29 +145,29 @@ api/
 
 ### Environment
 
-**Secrets** (set via `wrangler secret put`, never committed):
+**Secrets** (set via `wrangler secret put`, stored in Cloudflare):
 | Secret | Description |
 |---|---|
-| `JWT_SECRET` | Long random string for signing JWTs |
+| `JWT_SECRET` | Long random hex string for signing JWTs |
 | `ADMIN_USERNAME` | Admin login username |
 | `ADMIN_PASSWORD_HASH` | bcrypt hash of admin password |
-| `VERCEL_DEPLOY_HOOK` | Vercel deploy hook URL (optional, triggers rebuild on publish) |
+| `VERCEL_DEPLOY_HOOK` | Vercel deploy hook URL (triggers rebuild on publish) |
 
 **Vars** (in `wrangler.toml`, safe to commit):
-| Var | Description |
+| Var | Value |
 |---|---|
 | `CORS_ORIGINS` | Comma-separated list of allowed origins |
-| `R2_PUBLIC_URL` | Public base URL for your R2 bucket |
+| `R2_PUBLIC_URL` | Public base URL for R2 images |
 
 **Bindings** (in `wrangler.toml`):
-| Binding | Type |
-|---|---|
-| `DB` | D1 Database |
-| `R2_BUCKET` | R2 Bucket |
+| Binding | Type | Name |
+|---|---|---|
+| `DB` | D1 Database | `blog-db` |
+| `R2_BUCKET` | R2 Bucket | `blog-images` |
 
-### Database schema
+### Database Schema
 
-SQLite (D1). Tags are stored as a JSON array string (e.g. `["javascript","react"]`).
+SQLite (D1). Tags stored as a JSON array string (e.g. `["javascript","react"]`).
 
 ```sql
 CREATE TABLE IF NOT EXISTS posts (
@@ -222,73 +187,72 @@ CREATE TABLE IF NOT EXISTS posts (
 ### Deployment
 
 ```bash
-cd api
+cd blog-api-workers
 npx wrangler deploy
 ```
 
-To set or update secrets:
+To update secrets:
 ```bash
 npx wrangler secret put SECRET_NAME
 ```
 
-To apply schema to remote D1:
+To apply schema changes to remote DB:
 ```bash
-npx wrangler d1 execute <your-db-name> --remote --file=schema.sql
+npx wrangler d1 execute blog-db --remote --file=schema.sql
 ```
 
 ---
 
-## admin/
+## blog-admin-ui
 
-The admin dashboard for managing blog posts.
+The admin dashboard for creating and managing blog posts.
 
 ### Stack
 - **Framework**: Next.js (App Router)
-- **Editor**: Tiptap (rich text with image upload support)
+- **Editor**: Tiptap (rich text, with image upload support)
 - **Auth**: JWT stored in localStorage, auto-logout on 401
 
 ### Features
-- Login / logout
-- List all posts (pagination, status badges, tags)
-- Create and edit posts with a rich text editor
-- Publish, save as draft, or unpublish
+- Login/logout
+- List all posts (with pagination, status badges, tags)
+- Create/edit posts with rich text editor
+- Publish / save as draft / unpublish
 - Delete posts
 - Tags (comma-separated input)
 - SEO fields (meta description, OG image URL)
-- Image upload (uploads to R2 via API, inserted into editor)
+- Image upload (uploads to R2 via API, inserts into editor)
 
 ### Environment
 
-| Var | Description |
+Set in Vercel dashboard under Environment Variables:
+| Var | Value |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | URL of your deployed Cloudflare Worker |
+| `NEXT_PUBLIC_API_URL` | `https://blog-api.abhinav-velaga.workers.dev` |
 
 ### Deployment
 
-Connect the `admin/` directory to a Vercel project and set `NEXT_PUBLIC_API_URL` in the Vercel dashboard under Environment Variables.
-
-To deploy manually:
+Connected to Vercel. To redeploy manually:
 ```bash
-cd admin
+cd blog-admin-ui
 vercel --prod
 ```
 
 ---
 
-## Authentication flow
+## Authentication Flow
 
 1. Admin submits username + password to `POST /api/auth/login`
 2. API checks username against `ADMIN_USERNAME` secret
 3. API compares password against `ADMIN_PASSWORD_HASH` (bcrypt)
 4. On success, returns a signed JWT (7-day expiry)
 5. Admin UI stores JWT in localStorage
-6. All authenticated requests send `Authorization: Bearer <token>`
+6. All subsequent authenticated requests send `Authorization: Bearer <token>`
 7. API middleware verifies JWT signature using `JWT_SECRET`
 8. On 401, admin UI clears token and redirects to login
 
-### Generating a password hash
+### Generating a new password hash
 ```bash
-cd api
+cd blog-api-workers
 node scripts/hash-password.js yournewpassword
 # Copy the output and run:
 npx wrangler secret put ADMIN_PASSWORD_HASH
@@ -296,7 +260,7 @@ npx wrangler secret put ADMIN_PASSWORD_HASH
 
 ---
 
-## Image upload flow
+## Image Upload Flow
 
 1. User clicks "Image" in the Tiptap toolbar
 2. File picker opens (JPEG, PNG, GIF, WebP only)
@@ -309,53 +273,54 @@ npx wrangler secret put ADMIN_PASSWORD_HASH
 
 ---
 
-## CORS
+## CORS Configuration
 
-Allowed origins are configured in `wrangler.toml` under `CORS_ORIGINS` as a comma-separated list. After editing, redeploy:
+Allowed origins are set in `wrangler.toml` under `CORS_ORIGINS`. To add a new origin:
 
-```bash
-npx wrangler deploy
-```
+1. Edit `wrangler.toml`
+2. Run `npx wrangler deploy`
 
----
-
-## Vercel deploy webhook
-
-When a post is published, the API fires a POST to the URL stored in `VERCEL_DEPLOY_HOOK`, triggering a Vercel rebuild. This is useful for statically generated frontends that consume the API. The call is made via `c.executionCtx.waitUntil()` so it doesn't block the API response.
-
-This is optional — if `VERCEL_DEPLOY_HOOK` is not set, the behavior is skipped.
+Current allowed origins:
+- `https://blog-admin-ui-navy.vercel.app`
+- `https://admin.abhi.work`
 
 ---
 
-## Local development
+## Local Development
 
 ### API
 ```bash
-cd api
-
-# Copy the example vars file and fill in your values
-cp .dev.vars.example .dev.vars
-
+cd blog-api-workers
+# Create .dev.vars with local secrets (gitignored):
+# JWT_SECRET=...
+# ADMIN_USERNAME=...
+# ADMIN_PASSWORD_HASH=...
 npx wrangler dev
 ```
 
 Apply schema to local D1:
 ```bash
-npx wrangler d1 execute <your-db-name> --local --file=schema.sql
+npx wrangler d1 execute blog-db --local --file=schema.sql
 ```
 
 ### Admin UI
 ```bash
-cd admin
-
-# Copy the example env file and fill in your API URL
-cp .env.local.example .env.local
-
+cd blog-admin-ui
+# Create .env.local (gitignored):
+# NEXT_PUBLIC_API_URL=http://localhost:8787
 npm run dev
 ```
 
-Make sure `http://localhost:3000` (or your dev port) is included in `CORS_ORIGINS` in `wrangler.toml` when developing locally.
+> Note: When developing locally, add `http://localhost:3000` (or whatever port) back to `CORS_ORIGINS` in `wrangler.toml`, or run `wrangler dev` and point the admin UI at the local Worker URL instead.
 
 ---
 
-last updated 2.27.26
+## Vercel Deploy Webhook
+
+When a post is published or updated to published status, the API fires a POST request to the Vercel deploy hook URL stored in `VERCEL_DEPLOY_HOOK`. This triggers a rebuild of any statically generated frontend connected to the hook.
+
+The webhook call uses `c.executionCtx.waitUntil()` so it completes after the HTTP response is returned without delaying the API response.
+
+---
+
+last updated 2/25/26
