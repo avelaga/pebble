@@ -57,8 +57,8 @@ async function main() {
   }
 
   // Resource names
-  const dbName = (await prompt("\nD1 database name [blog-db]: ")) || "blog-db";
-  const bucketName = (await prompt("R2 bucket name [blog-images]: ")) || "blog-images";
+  const dbName = (await prompt("\nD1 database name [pebble-cms-db]: ")) || "pebble-cms-db";
+  const bucketName = (await prompt("R2 bucket name [pebble-cms-images]: ")) || "pebble-cms-images";
 
   // Create D1 database
   console.log(`\nCreating D1 database "${dbName}"...`);
