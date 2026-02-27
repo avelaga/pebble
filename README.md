@@ -330,7 +330,8 @@ This is optional — if `VERCEL_DEPLOY_HOOK` is not set, the behavior is skipped
 ```bash
 cd api
 
-# Copy the example vars file and fill in your values
+# Copy the example config files and fill in your values
+cp wrangler.toml.example wrangler.toml
 cp .dev.vars.example .dev.vars
 
 npx wrangler dev

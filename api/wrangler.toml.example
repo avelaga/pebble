@@ -1,0 +1,16 @@
+name = "pebble-cms-api"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+
+[vars]
+CORS_ORIGINS = "https://your-admin.vercel.app,http://localhost:3000"
+R2_PUBLIC_URL = "https://pub-YOUR_BUCKET_ID.r2.dev"
+
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "pebble-cms-images"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pebble-cms-db"
+database_id = "your-d1-database-id"

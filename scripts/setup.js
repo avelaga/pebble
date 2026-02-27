@@ -246,7 +246,9 @@ async function main() {
   // Update wrangler.toml
   console.log("\nUpdating wrangler.toml...");
   const tomlPath = path.join(API_DIR, "wrangler.toml");
-  let toml = fs.readFileSync(tomlPath, "utf8");
+  const tomlExamplePath = tomlPath + ".example";
+  if (!DRY_RUN) fs.copyFileSync(tomlExamplePath, tomlPath);
+  let toml = DRY_RUN ? fs.readFileSync(tomlExamplePath, "utf8") : fs.readFileSync(tomlPath, "utf8");
   toml = toml
     .replace(/^name = ".*"$/m, `name = "${workerName}"`)
     .replace(/^database_name = ".*"$/m, `database_name = "${dbName}"`)
@@ -460,9 +462,6 @@ async function main() {
   console.log(DRY_RUN ? "\n-- Dry run complete (nothing was created) --" : "\n-- Setup complete --");
   if (workerUrl) console.log(`Worker:  ${workerUrl}`);
   if (prodAdminUrl) console.log(`Admin:   ${prodAdminUrl}`);
-  console.log("\nTo prevent accidentally committing your local config:");
-  console.log("  git update-index --skip-worktree api/wrangler.toml");
-  console.log("This keeps your Cloudflare IDs and URLs out of git without adding them to .gitignore.");
   console.log("\nOptional: if you have a Vercel-hosted frontend that consumes this API,");
   console.log("create a deploy hook in its Vercel dashboard (Settings -> Git -> Deploy Hooks)");
   console.log("and set it as a secret on the Worker:");
