@@ -21,44 +21,23 @@ api/ (Cloudflare Workers)
 - [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier is enough)
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/): `npm install -g wrangler && wrangler login`
 
-### 1. Create Cloudflare resources
-
-In your Cloudflare dashboard (or via Wrangler), create:
-- A **D1 database** — copy the database name and ID into `api/wrangler.toml`
-- An **R2 bucket** — copy the bucket name and public URL into `api/wrangler.toml`
-
-### 2. Set up the API
+### Run the setup script
 
 ```bash
-cd api
-npm install
-
-# Apply schema to your D1 database
-npx wrangler d1 execute your-d1-database-name --remote --file=schema.sql
-
-# Generate a password hash for your admin account
-node scripts/hash-password.js yourpassword
-
-# Set production secrets
-npx wrangler secret put JWT_SECRET
-npx wrangler secret put ADMIN_USERNAME
-npx wrangler secret put ADMIN_PASSWORD_HASH
-
-# Deploy
-npx wrangler deploy
+node scripts/setup.js
 ```
 
-### 3. Set up the admin
+The script will:
+- Create a D1 database and R2 bucket in your Cloudflare account
+- Update `api/wrangler.toml` with the generated IDs
+- Apply the database schema
+- Prompt for admin credentials and set all secrets
+- Deploy the Worker
+- Write `admin/.env.local` with your Worker URL
 
-```bash
-cd admin
-npm install
+The one manual step is enabling public access on your R2 bucket — the script will pause and tell you exactly where to do it.
 
-# Copy example env file and set your API URL
-cp .env.local.example .env.local
-```
-
-Then set `NEXT_PUBLIC_API_URL` to your deployed Worker URL in `.env.local`, and deploy to Vercel (see [admin deployment](#deployment-1)).
+After the script completes, deploy `admin/` to Vercel and add your Vercel URL to `CORS_ORIGINS` in `api/wrangler.toml`, then redeploy.
 
 ---
 
