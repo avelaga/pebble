@@ -233,6 +233,15 @@ To apply schema to remote D1:
 npx wrangler d1 execute <your-db-name> --remote --file=schema.sql
 ```
 
+### Auto-deploy on push
+
+The included GitHub Actions workflow (`.github/workflows/deploy-api.yml`) redeploys the Worker on every push to `main` that touches `api/`.
+
+**Setup:**
+1. Go to Cloudflare Dashboard → My Profile → API Tokens → Create Token
+2. Use the **"Edit Cloudflare Workers"** template
+3. Add the token to your GitHub repo under Settings → Secrets → `CLOUDFLARE_API_TOKEN`
+
 ---
 
 ## admin/
