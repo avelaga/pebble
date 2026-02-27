@@ -5,6 +5,8 @@ const readline = require("readline");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const https = require("https");
+const os = require("os");
 
 const ROOT_DIR = path.join(__dirname, "..");
 const API_DIR = path.join(ROOT_DIR, "api");
@@ -77,6 +79,53 @@ function writeFile(filePath, content) {
 
 function stripAnsi(str) {
   return str.replace(/\x1B\[[0-9;]*m/g, "");
+}
+
+function getVercelToken() {
+  const locations = [
+    path.join(os.homedir(), "Library", "Application Support", "com.vercel.cli", "auth.json"), // macOS
+    path.join(os.homedir(), ".local", "share", "com.vercel.cli", "auth.json"), // Linux
+    path.join(os.homedir(), ".config", "com.vercel.cli", "auth.json"),
+    path.join(os.homedir(), ".vercel", "auth.json"),
+  ];
+  for (const loc of locations) {
+    if (fs.existsSync(loc)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(loc, "utf8"));
+        if (data.token) return data.token;
+      } catch {}
+    }
+  }
+  return null;
+}
+
+function setVercelRootDirectory(projectId, token) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({ rootDirectory: "admin" });
+    const req = https.request(
+      {
+        hostname: "api.vercel.com",
+        path: `/v9/projects/${projectId}`,
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => { data += chunk; });
+        res.on("end", () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) resolve();
+          else reject(new Error(`Vercel API ${res.statusCode}: ${data}`));
+        });
+      }
+    );
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
 }
 
 function checkNodeVersion() {
@@ -309,6 +358,24 @@ async function main() {
     const urlMatch = stripAnsi(vercelOutput).match(/https:\/\/[^\s]+\.vercel\.app/);
     vercelUrl = urlMatch ? urlMatch[0] : null;
     if (vercelUrl) console.log(`Vercel URL: ${vercelUrl}`);
+  }
+
+  // Set root directory to admin/ so Git-triggered deploys build from the right place
+  console.log("\nConfiguring Vercel root directory...");
+  if (DRY_RUN) {
+    console.log("  [dry-run] PATCH /v9/projects/{projectId} rootDirectory=admin");
+  } else {
+    try {
+      const vercelProjectJson = path.join(ADMIN_DIR, ".vercel", "project.json");
+      const { projectId } = JSON.parse(fs.readFileSync(vercelProjectJson, "utf8"));
+      const token = getVercelToken();
+      if (!token) throw new Error("Could not find Vercel auth token.");
+      await setVercelRootDirectory(projectId, token);
+      console.log("Root directory set to admin/.");
+    } catch (e) {
+      console.log(`  Could not set root directory automatically: ${e.message}`);
+      console.log("  Set it manually in the Vercel dashboard: Project Settings -> General -> Root Directory -> admin");
+    }
   }
 
   // Set NEXT_PUBLIC_API_URL on Vercel and redeploy
