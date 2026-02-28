@@ -3,7 +3,7 @@
 A minimalist, self-hosted blog CMS built on serverless infrastructure. Runs entirely on free tiers.
 
 ```
-admin/ (Vercel)
+editor/ (Vercel)
        │
        ▼
 api/ (Cloudflare Workers)
@@ -33,9 +33,9 @@ The script handles the full deployment end-to-end:
 - Create a D1 database and R2 bucket in your Cloudflare account
 - Update `api/wrangler.toml` with the generated IDs
 - Apply the database schema
-- Prompt for admin credentials and set all Cloudflare secrets
+- Prompt for editor credentials and set all Cloudflare secrets
 - Deploy the Worker
-- Deploy the admin UI to Vercel
+- Deploy the editor UI to Vercel
 - Set `NEXT_PUBLIC_API_URL` on the Vercel project and redeploy
 - Update `CORS_ORIGINS` with the Vercel URL and redeploy the Worker
 
@@ -59,7 +59,7 @@ Pebble is a headless blog CMS with two components:
 | Directory | Purpose |
 |---|---|
 | `api/` | REST API (Cloudflare Workers + Hono) |
-| `admin/` | Admin dashboard (Next.js) |
+| `editor/` | Editor UI (Next.js) |
 
 ---
 
@@ -174,8 +174,8 @@ api/
 | Secret | Description |
 |---|---|
 | `JWT_SECRET` | Long random string for signing JWTs |
-| `ADMIN_USERNAME` | Admin login username |
-| `ADMIN_PASSWORD_HASH` | bcrypt hash of admin password |
+| `EDITOR_USERNAME` | Editor login username |
+| `EDITOR_PASSWORD_HASH` | bcrypt hash of editor password |
 | `VERCEL_DEPLOY_HOOK` | Vercel deploy hook URL (optional, triggers rebuild on publish) |
 
 **Vars** (in `wrangler.toml`, safe to commit):
@@ -237,9 +237,9 @@ The included GitHub Actions workflow (`.github/workflows/deploy-api.yml`) redepl
 
 ---
 
-## admin/
+## editor/
 
-The admin dashboard for managing blog posts.
+The editor UI for managing blog posts.
 
 ### Stack
 - **Framework**: Next.js (App Router)
@@ -264,11 +264,11 @@ The admin dashboard for managing blog posts.
 
 ### Deployment
 
-Connect the `admin/` directory to a Vercel project and set `NEXT_PUBLIC_API_URL` in the Vercel dashboard under Environment Variables.
+Connect the `editor/` directory to a Vercel project and set `NEXT_PUBLIC_API_URL` in the Vercel dashboard under Environment Variables.
 
 To deploy manually:
 ```bash
-cd admin
+cd editor
 vercel --prod
 ```
 
@@ -276,21 +276,21 @@ vercel --prod
 
 ## Authentication flow
 
-1. Admin submits username + password to `POST /api/auth/login`
-2. API checks username against `ADMIN_USERNAME` secret
-3. API compares password against `ADMIN_PASSWORD_HASH` (bcrypt)
+1. Editor submits username + password to `POST /api/auth/login`
+2. API checks username against `EDITOR_USERNAME` secret
+3. API compares password against `EDITOR_PASSWORD_HASH` (bcrypt)
 4. On success, returns a signed JWT (7-day expiry)
-5. Admin UI stores JWT in localStorage
+5. Editor UI stores JWT in localStorage
 6. All authenticated requests send `Authorization: Bearer <token>`
 7. API middleware verifies JWT signature using `JWT_SECRET`
-8. On 401, admin UI clears token and redirects to login
+8. On 401, editor UI clears token and redirects to login
 
 ### Generating a password hash
 ```bash
 cd api
 node scripts/hash-password.js yournewpassword
 # Copy the output and run:
-npx wrangler secret put ADMIN_PASSWORD_HASH
+npx wrangler secret put EDITOR_PASSWORD_HASH
 ```
 
 ---
@@ -299,7 +299,7 @@ npx wrangler secret put ADMIN_PASSWORD_HASH
 
 1. User clicks "Image" in the Tiptap toolbar
 2. File picker opens (JPEG, PNG, GIF, WebP only)
-3. Admin UI POSTs the file to `POST /api/uploads` with JWT auth
+3. Editor UI POSTs the file to `POST /api/uploads` with JWT auth
 4. Worker validates file type and size (max 5MB)
 5. Worker generates a unique filename: `{timestamp}-{random}.{ext}`
 6. Worker uploads to R2 via native binding (no S3 credentials needed)
@@ -344,9 +344,9 @@ Apply schema to local D1:
 npx wrangler d1 execute <your-db-name> --local --file=schema.sql
 ```
 
-### Admin UI
+### Editor UI
 ```bash
-cd admin
+cd editor
 
 # Copy the example env file and fill in your API URL
 cp .env.local.example .env.local

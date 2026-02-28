@@ -10,7 +10,7 @@ const os = require("os");
 
 const ROOT_DIR = path.join(__dirname, "..");
 const API_DIR = path.join(ROOT_DIR, "api");
-const ADMIN_DIR = path.join(ROOT_DIR, "admin");
+const EDITOR_DIR = path.join(ROOT_DIR, "editor");
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -44,7 +44,7 @@ function setSecret(name, value) {
   if (result.status !== 0) throw new Error(`Failed to set secret: ${name}`);
 }
 
-function setVercelEnv(key, value, cwd = ADMIN_DIR) {
+function setVercelEnv(key, value, cwd = EDITOR_DIR) {
   const result = spawnSync("vercel", ["env", "add", key, "production"], {
     cwd,
     input: value + "\n",
@@ -136,7 +136,7 @@ function getVercelToken() {
 
 function setVercelRootDirectory(projectId, token) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ rootDirectory: "admin" });
+    const body = JSON.stringify({ rootDirectory: "editor" });
     const req = https.request(
       {
         hostname: "api.vercel.com",
@@ -180,16 +180,16 @@ async function main() {
   const prefixArg = process.argv.find((a) => a.startsWith("--prefix="));
   const prefix = prefixArg ? prefixArg.split("=")[1] : "pebble";
 
-  const defaultWorkerName = `${prefix}-cms-api`;
-  const defaultDbName = `${prefix}-cms-db`;
-  const defaultBucketName = `${prefix}-cms-images`;
-  const defaultAdminName = `${prefix}-cms-admin`;
+  const defaultWorkerName = `${prefix}-pebble-api`;
+  const defaultDbName = `${prefix}-pebble-db`;
+  const defaultBucketName = `${prefix}-pebble-images`;
+  const defaultEditorName = `${prefix}-pebble-editor`;
 
   // Install dependencies
   console.log("Installing API dependencies...");
   execSync("npm install", { cwd: API_DIR, stdio: "inherit" });
-  console.log("Installing admin dependencies...");
-  execSync("npm install", { cwd: ADMIN_DIR, stdio: "inherit" });
+  console.log("Installing editor dependencies...");
+  execSync("npm install", { cwd: EDITOR_DIR, stdio: "inherit" });
 
   // Check Wrangler auth
   console.log("\nChecking Wrangler authentication...");
@@ -227,12 +227,12 @@ async function main() {
   const workerName = (await prompt(`  Cloudflare Worker [${defaultWorkerName}]: `)) || defaultWorkerName;
   const dbName = (await prompt(`  D1 database       [${defaultDbName}]: `)) || defaultDbName;
   const bucketName = (await prompt(`  R2 bucket         [${defaultBucketName}]: `)) || defaultBucketName;
-  const adminName = (await prompt(`  Vercel project    [${defaultAdminName}]: `)) || defaultAdminName;
+  const editorName = (await prompt(`  Vercel project    [${defaultEditorName}]: `)) || defaultEditorName;
 
   validateResourceName(workerName);
   validateResourceName(dbName);
   validateResourceName(bucketName);
-  validateResourceName(adminName);
+  validateResourceName(editorName);
 
   // Create D1 database
   console.log(`\nCreating D1 database "${dbName}"...`);
@@ -322,19 +322,19 @@ async function main() {
     stdio: "inherit",
   });
 
-  // Admin credentials
-  console.log("\nCreate your admin account:");
-  const adminUsername = await prompt("Username: ");
-  let adminPassword;
+  // Editor credentials
+  console.log("\nCreate your editor account:");
+  const editorUsername = await prompt("Username: ");
+  let editorPassword;
   while (true) {
-    adminPassword = await prompt("Password: ");
-    const adminPasswordConfirm = await prompt("Confirm password: ");
-    if (adminPassword === adminPasswordConfirm) break;
+    editorPassword = await prompt("Password: ");
+    const editorPasswordConfirm = await prompt("Confirm password: ");
+    if (editorPassword === editorPasswordConfirm) break;
     console.log("  Passwords do not match. Try again.");
   }
 
   // Hash password
-  const hashResult = spawnSync("node", ["scripts/hash-password.js", adminPassword], {
+  const hashResult = spawnSync("node", ["scripts/hash-password.js", editorPassword], {
     cwd: API_DIR,
     encoding: "utf8",
     stdio: ["inherit", "pipe", "pipe"],
@@ -351,8 +351,8 @@ async function main() {
   // Set Cloudflare secrets
   console.log("\nSetting Cloudflare secrets...");
   setSecret("JWT_SECRET", jwtSecret);
-  setSecret("ADMIN_USERNAME", adminUsername);
-  setSecret("ADMIN_PASSWORD_HASH", passwordHash);
+  setSecret("EDITOR_USERNAME", editorUsername);
+  setSecret("EDITOR_PASSWORD_HASH", passwordHash);
 
   // Deploy Worker
   console.log("\nDeploying Worker...");
@@ -367,20 +367,20 @@ async function main() {
     process.exit(1);
   }
 
-  // Write admin/.env.local
-  const envPath = path.join(ADMIN_DIR, ".env.local");
+  // Write editor/.env.local
+  const envPath = path.join(EDITOR_DIR, ".env.local");
   if (workerUrl && !fs.existsSync(envPath)) {
     fs.writeFileSync(envPath, `NEXT_PUBLIC_API_URL=${workerUrl}\n`);
-    console.log("\nCreated admin/.env.local");
+    console.log("\nCreated editor/.env.local");
   }
 
-  // Deploy admin to Vercel (initial deploy to create the project)
-  console.log("\nDeploying admin to Vercel...");
+  // Deploy editor to Vercel (initial deploy to create the project)
+  console.log("\nDeploying editor to Vercel...");
   console.log("  Note: you may be prompted to select your Vercel account on first deploy.");
   let vercelUrl;
   try {
-    const vercelOutput = execSync(`vercel deploy --prod --yes --name ${adminName}`, {
-      cwd: ADMIN_DIR,
+    const vercelOutput = execSync(`vercel deploy --prod --yes --name ${editorName}`, {
+      cwd: EDITOR_DIR,
       encoding: "utf8",
       stdio: ["inherit", "pipe", "pipe"],
     });
@@ -398,10 +398,10 @@ async function main() {
     console.log("\nSetting Vercel environment variable...");
     setVercelEnv("NEXT_PUBLIC_API_URL", workerUrl);
 
-    console.log("\nRedeploying admin to pick up env var...");
+    console.log("\nRedeploying editor to pick up env var...");
     try {
       const redeployOutput = execSync(`vercel deploy --prod --yes`, {
-        cwd: ADMIN_DIR,
+        cwd: EDITOR_DIR,
         encoding: "utf8",
         stdio: ["inherit", "pipe", "pipe"],
       });
@@ -414,19 +414,19 @@ async function main() {
     }
   }
 
-  // Set root directory to admin/ so Git-triggered deploys build from the right place.
-  // Done after all CLI deploys to avoid Vercel resolving admin/admin for subsequent CLI runs.
+  // Set root directory to editor/ so Git-triggered deploys build from the right place.
+  // Done after all CLI deploys to avoid Vercel resolving editor/editor for subsequent CLI runs.
   console.log("\nConfiguring Vercel root directory...");
   try {
-    const vercelProjectJson = path.join(ADMIN_DIR, ".vercel", "project.json");
+    const vercelProjectJson = path.join(EDITOR_DIR, ".vercel", "project.json");
     const { projectId } = JSON.parse(fs.readFileSync(vercelProjectJson, "utf8"));
     const token = getVercelToken();
     if (!token) throw new Error("Could not find Vercel auth token.");
     await setVercelRootDirectory(projectId, token);
-    console.log("Root directory set to admin/.");
+    console.log("Root directory set to editor/.");
   } catch (e) {
     console.log(`  Could not set root directory automatically: ${e.message}`);
-    console.log("  Set it manually in the Vercel dashboard: Project Settings -> General -> Root Directory -> admin");
+    console.log("  Set it manually in the Vercel dashboard: Project Settings -> General -> Root Directory -> editor");
   }
 
   // Connect GitHub repo to Vercel project for auto-deploy on push
@@ -449,9 +449,9 @@ async function main() {
           console.log("  Warning: your GitHub repo does not appear to have been pushed yet.");
           console.log("  Push it first (git push -u origin main), then run:");
           console.log(`    vercel git connect ${remoteUrl}`);
-          console.log("  from the admin/ directory.");
+          console.log("  from the editor/ directory.");
         } else {
-          execSync(`vercel git connect ${remoteUrl}`, { cwd: ADMIN_DIR, stdio: "inherit" });
+          execSync(`vercel git connect ${remoteUrl}`, { cwd: EDITOR_DIR, stdio: "inherit" });
           console.log("GitHub repo linked.");
         }
       }
@@ -462,18 +462,18 @@ async function main() {
     }
   }
 
-  // Ask for production admin URL (may differ from Vercel preview URL if using a custom domain)
-  let prodAdminUrl = vercelUrl;
+  // Ask for production editor URL (may differ from Vercel preview URL if using a custom domain)
+  let prodEditorUrl = vercelUrl;
   if (vercelUrl) {
-    const customUrl = await prompt(`\nProduction admin URL (press enter to use ${vercelUrl}): `);
-    if (customUrl) prodAdminUrl = customUrl;
+    const customUrl = await prompt(`\nProduction editor URL (press enter to use ${vercelUrl}): `);
+    if (customUrl) prodEditorUrl = customUrl;
   }
 
-  // Update CORS_ORIGINS with admin URL and redeploy Worker
-  if (prodAdminUrl) {
+  // Update CORS_ORIGINS with editor URL and redeploy Worker
+  if (prodEditorUrl) {
     console.log("\nUpdating CORS_ORIGINS...");
     let updatedToml = fs.readFileSync(tomlPath, "utf8");
-    updatedToml = updatedToml.replace(/^CORS_ORIGINS = ".*"$/m, `CORS_ORIGINS = "${prodAdminUrl},http://localhost:3000"`);
+    updatedToml = updatedToml.replace(/^CORS_ORIGINS = ".*"$/m, `CORS_ORIGINS = "${prodEditorUrl},http://localhost:3000"`);
     fs.writeFileSync(tomlPath, updatedToml);
 
     console.log("\nRedeploying Worker with updated CORS...");
@@ -483,7 +483,7 @@ async function main() {
   // Done
   console.log("\n-- Setup complete --");
   if (workerUrl) console.log(`Worker:  ${workerUrl}`);
-  if (prodAdminUrl) console.log(`Admin:   ${prodAdminUrl}`);
+  if (prodEditorUrl) console.log(`Editor:  ${prodEditorUrl}`);
   console.log("\nNext: enable the GitHub Action for automatic Worker deploys on push:");
   console.log("  1. Go to dash.cloudflare.com -> My Profile -> API Tokens -> Create Token");
   console.log("  2. Use the 'Edit Cloudflare Workers' template");

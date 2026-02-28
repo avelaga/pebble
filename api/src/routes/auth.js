@@ -11,11 +11,11 @@ authRoutes.post("/login", async (c) => {
     return c.json({ error: "Username and password are required" }, 400);
   }
 
-  if (username !== c.env.ADMIN_USERNAME) {
+  if (username !== c.env.EDITOR_USERNAME) {
     return c.json({ error: "Invalid credentials" }, 401);
   }
 
-  const valid = await bcrypt.compare(password, c.env.ADMIN_PASSWORD_HASH);
+  const valid = await bcrypt.compare(password, c.env.EDITOR_PASSWORD_HASH);
   if (!valid) {
     return c.json({ error: "Invalid credentials" }, 401);
   }
