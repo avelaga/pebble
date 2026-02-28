@@ -1,6 +1,6 @@
 # pebble
 
-A minimalist, self-hosted blog CMS built on serverless infrastructure. Runs entirely on free tiers.
+A minimalist, self-hosted blog CMS built on serverless infrastructure and that runs entirely on free tiers.
 
 <img src="https://i.imgur.com/rq5lrhG.png"/>
 <img src="https://i.imgur.com/bMOmQPV.png"/>
@@ -22,11 +22,11 @@ A minimalist, self-hosted blog CMS built on serverless infrastructure. Runs enti
 node scripts/setup.js
 ```
 
-Handles the full deployment end-to-end: creates Cloudflare resources, applies the schema, sets secrets, deploys the Worker and editor, and wires up CORS. The script will try to enable public access on your R2 bucket automatically — if it can't, it'll tell you where to do it manually.
+Handles the full deployment end-to-end: creates Cloudflare resources, applies the schema, sets secrets, deploys the Worker and editor, and wires up CORS. The script will try to enable public access on your R2 bucket automatically - if it can't, it'll tell you where to do it manually.
 
 #### Options
 
-**`--prefix`** — Namespaces all resources so multiple instances can coexist on the same account.
+**`--prefix`** - Namespaces all resources so multiple instances can coexist on the same account.
 
 ```bash
 node scripts/setup.js --prefix=my-site
@@ -62,16 +62,16 @@ api/
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/api/auth/login` | — | Returns JWT (7-day expiry) |
+| POST | `/api/auth/login` | - | Returns JWT (7-day expiry) |
 | GET | `/api/posts` | Optional | List posts. Params: `status`, `tag`, `page`, `limit` |
-| GET | `/api/posts/:id` | — | Get post by ID |
-| GET | `/api/posts/by-slug/:slug` | — | Get post by slug |
-| GET | `/api/posts/by-tag/:tag` | — | List posts by tag |
+| GET | `/api/posts/:id` | - | Get post by ID |
+| GET | `/api/posts/by-slug/:slug` | - | Get post by slug |
+| GET | `/api/posts/by-tag/:tag` | - | List posts by tag |
 | POST | `/api/posts` | Required | Create post |
 | PUT | `/api/posts/:id` | Required | Update post |
 | DELETE | `/api/posts/:id` | Required | Delete post |
 | POST | `/api/uploads` | Required | Upload image (JPEG/PNG/GIF/WebP, max 5MB) |
-| GET | `/health` | — | Health check |
+| GET | `/health` | - | Health check |
 
 ### Environment
 
