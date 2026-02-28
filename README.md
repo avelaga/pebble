@@ -17,7 +17,7 @@ api/ (Cloudflare Workers)
 ## Getting started
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/)
+- [Node.js](https://nodejs.org/) 18.18+
 - [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier is enough)
 - [Vercel account](https://vercel.com/signup) (free tier is enough)
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/): `npm install -g wrangler && wrangler login`
@@ -37,9 +37,11 @@ The script handles the full deployment end-to-end:
 - Deploy the Worker
 - Deploy the editor UI to Vercel
 - Set `NEXT_PUBLIC_API_URL` on the Vercel project and redeploy
-- Update `CORS_ORIGINS` with the Vercel URL and redeploy the Worker
+- Set the Vercel root directory and link your GitHub repo for auto-deploy
+- Prompt for a custom production editor URL (if different from the Vercel preview URL)
+- Update `CORS_ORIGINS` with the editor URL and redeploy the Worker
 
-The one manual step is enabling public access on your R2 bucket — the script will pause and tell you exactly where to do it. On first Vercel deploy you may also be prompted to select your account.
+The script will try to enable public access on your R2 bucket automatically. If it can't, it will pause and tell you exactly where to do it manually. On first Vercel deploy you may also be prompted to select your account.
 
 #### Options
 
@@ -47,7 +49,7 @@ The one manual step is enabling public access on your R2 bucket — the script w
 
 ```bash
 node scripts/setup.js --prefix=my-site
-# creates: my-site-cms-api, my-site-cms-db, my-site-cms-images
+# creates: my-site-pebble-api, my-site-pebble-db, my-site-pebble-images
 ```
 
 ---
