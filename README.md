@@ -50,13 +50,6 @@ node scripts/setup.js --prefix=my-site
 # creates: my-site-cms-api, my-site-cms-db, my-site-cms-images
 ```
 
-**`--dry-run`** — Walks through the full setup flow without creating anything. Prompts for resource names, checks Wrangler auth, and prints every command that would run and every file that would be written.
-
-```bash
-node scripts/setup.js --dry-run
-node scripts/setup.js --dry-run --prefix=my-site
-```
-
 ---
 
 ## Overview

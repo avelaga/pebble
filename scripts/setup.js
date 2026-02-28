@@ -484,6 +484,11 @@ async function main() {
   console.log("\n-- Setup complete --");
   if (workerUrl) console.log(`Worker:  ${workerUrl}`);
   if (prodAdminUrl) console.log(`Admin:   ${prodAdminUrl}`);
+  console.log("\nNext: enable the GitHub Action for automatic Worker deploys on push:");
+  console.log("  1. Go to dash.cloudflare.com -> My Profile -> API Tokens -> Create Token");
+  console.log("  2. Use the 'Edit Cloudflare Workers' template");
+  console.log("  3. Add the token to your GitHub repo: Settings -> Secrets -> Actions");
+  console.log("     Name: CLOUDFLARE_API_TOKEN");
   console.log("\nOptional: if you have a Vercel-hosted frontend that consumes this API,");
   console.log("create a deploy hook in its Vercel dashboard (Settings -> Git -> Deploy Hooks)");
   console.log("and set it as a secret on the Worker:");
