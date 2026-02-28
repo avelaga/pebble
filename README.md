@@ -2,15 +2,8 @@
 
 A minimalist, self-hosted blog CMS built on serverless infrastructure. Runs entirely on free tiers.
 
-```
-editor/ (Vercel)
-       │
-       ▼
-api/ (Cloudflare Workers)
-       │
-       ├──▶ D1 (Cloudflare SQLite database)
-       └──▶ R2 (Cloudflare object storage)
-```
+<img src="https://i.imgur.com/rq5lrhG.png"/>
+<img src="https://i.imgur.com/bMOmQPV.png"/>
 
 ---
 
@@ -62,6 +55,16 @@ Pebble is a headless blog CMS with two components:
 |---|---|
 | `api/` | REST API (Cloudflare Workers + Hono) |
 | `editor/` | Editor UI (Next.js) |
+
+```
+editor/ (Vercel)
+       │
+       ▼
+api/ (Cloudflare Workers)
+       │
+       ├──▶ D1 (Cloudflare SQLite database)
+       └──▶ R2 (Cloudflare object storage)
+```
 
 ---
 
