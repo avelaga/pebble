@@ -1,6 +1,6 @@
 # pebble
 
-A minimalist, self-hosted blog CMS built on serverless infrastructure and that runs entirely on free tiers.
+A minimalist, self-hosted headless blog CMS built on serverless infrastructure and that runs entirely on free tiers.
 
 <img src="https://i.imgur.com/rq5lrhG.png"/>
 <img src="https://i.imgur.com/bMOmQPV.png"/>
