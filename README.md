@@ -22,23 +22,11 @@ A minimalist, self-hosted blog CMS built on serverless infrastructure. Runs enti
 node scripts/setup.js
 ```
 
-The script handles the full deployment end-to-end:
-- Create a D1 database and R2 bucket in your Cloudflare account
-- Update `api/wrangler.toml` with the generated IDs
-- Apply the database schema
-- Prompt for editor credentials and set all Cloudflare secrets
-- Deploy the Worker
-- Deploy the editor UI to Vercel
-- Set `NEXT_PUBLIC_API_URL` on the Vercel project and redeploy
-- Set the Vercel root directory and link your GitHub repo for auto-deploy
-- Prompt for a custom production editor URL (if different from the Vercel preview URL)
-- Update `CORS_ORIGINS` with the editor URL and redeploy the Worker
-
-The script will try to enable public access on your R2 bucket automatically. If it can't, it will pause and tell you exactly where to do it manually. On first Vercel deploy you may also be prompted to select your account.
+Handles the full deployment end-to-end: creates Cloudflare resources, applies the schema, sets secrets, deploys the Worker and editor, and wires up CORS. The script will try to enable public access on your R2 bucket automatically — if it can't, it'll tell you where to do it manually.
 
 #### Options
 
-**`--prefix`** — Namespaces all Cloudflare resources so multiple instances can coexist on the same account. Useful if you're deploying Pebble for more than one site.
+**`--prefix`** — Namespaces all resources so multiple instances can coexist on the same account.
 
 ```bash
 node scripts/setup.js --prefix=my-site
@@ -47,39 +35,10 @@ node scripts/setup.js --prefix=my-site
 
 ---
 
-## Overview
-
-Pebble is a headless blog CMS with two components:
-
-| Directory | Purpose |
-|---|---|
-| `api/` | REST API (Cloudflare Workers + Hono) |
-| `editor/` | Editor UI (Next.js) |
-
-```
-editor/ (Vercel)
-       │
-       ▼
-api/ (Cloudflare Workers)
-       │
-       ├──▶ D1 (Cloudflare SQLite database)
-       └──▶ R2 (Cloudflare object storage)
-```
-
----
-
 ## api/
 
-The core backend. A Cloudflare Worker built with [Hono](https://hono.dev/).
+Cloudflare Worker built with [Hono](https://hono.dev/). Uses D1 (SQLite) for posts and R2 for image storage. Auth is JWT + bcrypt.
 
-### Stack
-- **Runtime**: Cloudflare Workers (V8 isolates, no Node.js)
-- **Router**: Hono v4
-- **Database**: Cloudflare D1 via binding (`c.env.DB`)
-- **Image storage**: Cloudflare R2 via binding (`c.env.R2_BUCKET`)
-- **Auth**: JWT via `jose`, bcrypt via `bcryptjs`
-
-### Project structure
 ```
 api/
 ├── wrangler.toml              # Cloudflare config, bindings, vars
@@ -93,173 +52,70 @@ api/
     │   ├── posts.js           # CRUD for posts
     │   └── uploads.js         # Image upload to R2
     ├── middleware/
-    │   └── auth.js            # JWT verification (auth + optionalAuth)
+    │   └── auth.js            # JWT verification
     └── utils/
         ├── slug.js            # Title → URL slug
-        └── sanitize.js        # HTML sanitization (strips XSS vectors)
+        └── sanitize.js        # HTML sanitization
 ```
 
 ### API Endpoints
 
-#### Authentication
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/api/auth/login` | No | Returns JWT token (7-day expiry) |
-
-**Request:**
-```json
-{ "username": "string", "password": "string" }
-```
-**Response:**
-```json
-{ "token": "eyJ..." }
-```
-
-#### Posts
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| GET | `/api/posts` | Optional | List posts (published by default) |
-| GET | `/api/posts/by-slug/:slug` | No | Get published post by slug |
-| GET | `/api/posts/by-tag/:tag` | No | List published posts by tag |
-| GET | `/api/posts/:id` | No | Get post by ID |
+| POST | `/api/auth/login` | — | Returns JWT (7-day expiry) |
+| GET | `/api/posts` | Optional | List posts. Params: `status`, `tag`, `page`, `limit` |
+| GET | `/api/posts/:id` | — | Get post by ID |
+| GET | `/api/posts/by-slug/:slug` | — | Get post by slug |
+| GET | `/api/posts/by-tag/:tag` | — | List posts by tag |
 | POST | `/api/posts` | Required | Create post |
 | PUT | `/api/posts/:id` | Required | Update post |
 | DELETE | `/api/posts/:id` | Required | Delete post |
-
-**GET /api/posts query params:**
-- `status` — `published` (default), `draft`, or `all` (auth required for draft/all)
-- `tag` — filter by tag name
-- `page` — page number (default: 1)
-- `limit` — results per page (default: 20, max: 100)
-
-**Paginated response:**
-```json
-{
-  "posts": [...],
-  "pagination": { "page": 1, "limit": 20, "total": 42, "pages": 3 }
-}
-```
-
-**Post object:**
-```json
-{
-  "id": 1,
-  "title": "string",
-  "slug": "string",
-  "content": "HTML string",
-  "status": "published | draft",
-  "tags": ["string"],
-  "meta_description": "string",
-  "og_image": "string (URL)",
-  "created_at": "ISO 8601",
-  "updated_at": "ISO 8601"
-}
-```
-
-#### Uploads
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| POST | `/api/uploads` | Required | Upload image to R2 |
-
-**Request:** `multipart/form-data` with field `image` (JPEG, PNG, GIF, WebP, max 5MB)
-
-**Response:**
-```json
-{ "url": "https://<your-r2-public-url>/filename.jpg" }
-```
-
-#### Health
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| GET | `/health` | No | Health check |
+| POST | `/api/uploads` | Required | Upload image (JPEG/PNG/GIF/WebP, max 5MB) |
+| GET | `/health` | — | Health check |
 
 ### Environment
 
-**Secrets** (set via `wrangler secret put`, never committed):
+**Secrets** (`wrangler secret put`):
+
 | Secret | Description |
 |---|---|
-| `JWT_SECRET` | Long random string for signing JWTs |
+| `JWT_SECRET` | Random string for signing JWTs |
 | `EDITOR_USERNAME` | Editor login username |
 | `EDITOR_PASSWORD_HASH` | bcrypt hash of editor password |
-| `VERCEL_DEPLOY_HOOK` | Vercel deploy hook URL (optional, triggers rebuild on publish) |
+| `VERCEL_DEPLOY_HOOK` | Vercel deploy hook URL (optional) |
 
-**Vars** (in `wrangler.toml`, safe to commit):
+**Vars** (`wrangler.toml`):
+
 | Var | Description |
 |---|---|
-| `CORS_ORIGINS` | Comma-separated list of allowed origins |
+| `CORS_ORIGINS` | Comma-separated allowed origins |
 | `R2_PUBLIC_URL` | Public base URL for your R2 bucket |
-
-**Bindings** (in `wrangler.toml`):
-| Binding | Type |
-|---|---|
-| `DB` | D1 Database |
-| `R2_BUCKET` | R2 Bucket |
-
-### Database schema
-
-SQLite (D1). Tags are stored as a JSON array string (e.g. `["javascript","react"]`).
-
-```sql
-CREATE TABLE IF NOT EXISTS posts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  title TEXT UNIQUE NOT NULL,
-  content TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  status TEXT DEFAULT 'draft',
-  tags TEXT DEFAULT '[]',
-  meta_description TEXT DEFAULT '',
-  og_image TEXT DEFAULT '',
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
-);
-```
 
 ### Deployment
 
 ```bash
-cd api
-npx wrangler deploy
-```
-
-To set or update secrets:
-```bash
-npx wrangler secret put SECRET_NAME
-```
-
-To apply schema to remote D1:
-```bash
-npx wrangler d1 execute <your-db-name> --remote --file=schema.sql
+cd api && npx wrangler deploy
 ```
 
 ### Auto-deploy on push
 
-The included GitHub Actions workflow (`.github/workflows/deploy-api.yml`) redeploys the Worker on every push to `main` that touches `api/`.
+`.github/workflows/deploy-api.yml` redeploys the Worker on pushes to `main` that touch `api/`. Add a `CLOUDFLARE_API_TOKEN` secret to your GitHub repo (create one from the "Edit Cloudflare Workers" template in the Cloudflare dashboard).
 
-**Setup:**
-1. Go to Cloudflare Dashboard → My Profile → API Tokens → Create Token
-2. Use the **"Edit Cloudflare Workers"** template
-3. Add the token to your GitHub repo under Settings → Secrets → `CLOUDFLARE_API_TOKEN`
+### Updating credentials
+
+```bash
+cd api
+node scripts/hash-password.js yournewpassword
+npx wrangler secret put EDITOR_PASSWORD_HASH
+```
 
 ---
 
 ## editor/
 
-The editor UI for managing blog posts.
+Next.js editor UI (App Router). Uses Tiptap for rich text editing, JWT in localStorage for auth.
 
-### Stack
-- **Framework**: Next.js (App Router)
-- **Editor**: Tiptap (rich text with image upload support)
-- **Auth**: JWT stored in localStorage, auto-logout on 401
-
-### Features
-- Login / logout
-- List all posts (pagination, status badges, tags)
-- Create and edit posts with a rich text editor
-- Publish, save as draft, or unpublish
-- Delete posts
-- Tags (comma-separated input)
-- SEO fields (meta description, OG image URL)
-- Image upload (uploads to R2 via API, inserted into editor)
+**Features:** create/edit/delete posts, publish or draft, tags, SEO fields, image upload.
 
 ### Environment
 
@@ -269,65 +125,9 @@ The editor UI for managing blog posts.
 
 ### Deployment
 
-Connect the `editor/` directory to a Vercel project and set `NEXT_PUBLIC_API_URL` in the Vercel dashboard under Environment Variables.
-
-To deploy manually:
 ```bash
-cd editor
-vercel --prod
+cd editor && vercel --prod
 ```
-
----
-
-## Authentication flow
-
-1. Editor submits username + password to `POST /api/auth/login`
-2. API checks username against `EDITOR_USERNAME` secret
-3. API compares password against `EDITOR_PASSWORD_HASH` (bcrypt)
-4. On success, returns a signed JWT (7-day expiry)
-5. Editor UI stores JWT in localStorage
-6. All authenticated requests send `Authorization: Bearer <token>`
-7. API middleware verifies JWT signature using `JWT_SECRET`
-8. On 401, editor UI clears token and redirects to login
-
-### Generating a password hash
-```bash
-cd api
-node scripts/hash-password.js yournewpassword
-# Copy the output and run:
-npx wrangler secret put EDITOR_PASSWORD_HASH
-```
-
----
-
-## Image upload flow
-
-1. User clicks "Image" in the Tiptap toolbar
-2. File picker opens (JPEG, PNG, GIF, WebP only)
-3. Editor UI POSTs the file to `POST /api/uploads` with JWT auth
-4. Worker validates file type and size (max 5MB)
-5. Worker generates a unique filename: `{timestamp}-{random}.{ext}`
-6. Worker uploads to R2 via native binding (no S3 credentials needed)
-7. Worker returns the public R2 URL
-8. Tiptap inserts an `<img>` tag at the cursor position
-
----
-
-## CORS
-
-Allowed origins are configured in `wrangler.toml` under `CORS_ORIGINS` as a comma-separated list. After editing, redeploy:
-
-```bash
-npx wrangler deploy
-```
-
----
-
-## Vercel deploy webhook
-
-When a post is published, the API fires a POST to the URL stored in `VERCEL_DEPLOY_HOOK`, triggering a Vercel rebuild. This is useful for statically generated frontends that consume the API. The call is made via `c.executionCtx.waitUntil()` so it doesn't block the API response.
-
-This is optional — if `VERCEL_DEPLOY_HOOK` is not set, the behavior is skipped.
 
 ---
 
@@ -336,31 +136,27 @@ This is optional — if `VERCEL_DEPLOY_HOOK` is not set, the behavior is skipped
 ### API
 ```bash
 cd api
-
-# Copy the example config files and fill in your values
 cp wrangler.toml.example wrangler.toml
 cp .dev.vars.example .dev.vars
-
+npx wrangler d1 execute <your-db-name> --local --file=schema.sql
 npx wrangler dev
 ```
 
-Apply schema to local D1:
-```bash
-npx wrangler d1 execute <your-db-name> --local --file=schema.sql
-```
-
-### Editor UI
+### Editor
 ```bash
 cd editor
-
-# Copy the example env file and fill in your API URL
 cp .env.local.example .env.local
-
 npm run dev
 ```
 
-Make sure `http://localhost:3000` (or your dev port) is included in `CORS_ORIGINS` in `wrangler.toml` when developing locally.
+Make sure `http://localhost:3000` is in `CORS_ORIGINS` in `wrangler.toml`.
 
 ---
 
-last updated 2.27.26
+## Vercel deploy hook
+
+Set `VERCEL_DEPLOY_HOOK` as a Worker secret to trigger a Vercel rebuild whenever a post is published. Useful for statically generated frontends.
+
+---
+
+last updated 2.28.26
