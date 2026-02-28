@@ -10,7 +10,7 @@ export default function Home() {
   return (
     <main className="container">
       <div className="header">
-        <h1>Blog Editor</h1>
+        <h1>Pebble Editor</h1>
         <div className="header-actions">
           <Link href="/posts/new" className="new-post-btn">
             + New Post

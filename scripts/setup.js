@@ -466,7 +466,13 @@ async function main() {
   let prodEditorUrl = vercelUrl;
   if (vercelUrl) {
     const customUrl = await prompt(`\nProduction editor URL (press enter to use ${vercelUrl}): `);
-    if (customUrl) prodEditorUrl = customUrl;
+    if (customUrl) {
+      if (!customUrl.startsWith("https://") && !customUrl.startsWith("http://")) {
+        prodEditorUrl = "https://" + customUrl;
+      } else {
+        prodEditorUrl = customUrl;
+      }
+    }
   }
 
   // Update CORS_ORIGINS with editor URL and redeploy Worker
