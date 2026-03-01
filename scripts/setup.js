@@ -44,16 +44,6 @@ function setSecret(name, value) {
   if (result.status !== 0) throw new Error(`Failed to set secret: ${name}`);
 }
 
-function setVercelEnv(key, value, cwd = EDITOR_DIR) {
-  const result = spawnSync("vercel", ["env", "add", key, "production"], {
-    cwd,
-    input: value + "\n",
-    encoding: "utf8",
-    stdio: ["pipe", "inherit", "inherit"],
-  });
-  if (result.status !== 0) throw new Error(`Failed to set Vercel env: ${key}`);
-}
-
 function stripAnsi(str) {
   return str.replace(/\x1B\[[0-9;]*m/g, "");
 }
@@ -116,53 +106,6 @@ async function enableR2PublicDomain(bucketName, accountId) {
   return domain ? `https://${domain}` : null;
 }
 
-function getVercelToken() {
-  const locations = [
-    path.join(os.homedir(), "Library", "Application Support", "com.vercel.cli", "auth.json"), // macOS
-    path.join(os.homedir(), ".local", "share", "com.vercel.cli", "auth.json"), // Linux
-    path.join(os.homedir(), ".config", "com.vercel.cli", "auth.json"),
-    path.join(os.homedir(), ".vercel", "auth.json"),
-  ];
-  for (const loc of locations) {
-    if (fs.existsSync(loc)) {
-      try {
-        const data = JSON.parse(fs.readFileSync(loc, "utf8"));
-        if (data.token) return data.token;
-      } catch {}
-    }
-  }
-  return null;
-}
-
-function setVercelRootDirectory(projectId, token) {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ rootDirectory: "editor" });
-    const req = https.request(
-      {
-        hostname: "api.vercel.com",
-        path: `/v9/projects/${projectId}`,
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(body),
-        },
-      },
-      (res) => {
-        let data = "";
-        res.on("data", (chunk) => { data += chunk; });
-        res.on("end", () => {
-          if (res.statusCode >= 200 && res.statusCode < 300) resolve();
-          else reject(new Error(`Vercel API ${res.statusCode}: ${data}`));
-        });
-      }
-    );
-    req.on("error", reject);
-    req.write(body);
-    req.end();
-  });
-}
-
 function checkNodeVersion() {
   const [major, minor] = process.versions.node.split(".").map(Number);
   if (major < 18 || (major === 18 && minor < 18)) {
@@ -205,29 +148,30 @@ async function main() {
     if (accountIdMatch) cfAccountId = accountIdMatch[0];
     console.log("Authenticated.");
   } catch {
-    console.error("Not logged into Wrangler. Run: npx wrangler login");
-    process.exit(1);
-  }
-
-  // Check Vercel auth
-  console.log("\nChecking Vercel authentication...");
-  try {
-    execSync("vercel whoami", {
-      encoding: "utf8",
-      stdio: ["inherit", "pipe", "pipe"],
-    });
-    console.log("Authenticated.");
-  } catch {
-    console.error("Not logged into Vercel. Run: vercel login");
-    process.exit(1);
+    console.log("Not logged in. Opening Cloudflare login...");
+    execSync("npx wrangler login", { cwd: API_DIR, stdio: "inherit" });
+    try {
+      const whoamiOutput = execSync("npx wrangler whoami", {
+        cwd: API_DIR,
+        encoding: "utf8",
+        stdio: ["inherit", "pipe", "pipe"],
+        env: { ...process.env, NO_COLOR: "1" },
+      });
+      const accountIdMatch = stripAnsi(whoamiOutput).match(/[a-f0-9]{32}/);
+      if (accountIdMatch) cfAccountId = accountIdMatch[0];
+      console.log("Authenticated.");
+    } catch {
+      console.error("Authentication failed. Please run: npx wrangler login");
+      process.exit(1);
+    }
   }
 
   // Resource names
   console.log("\nResource names (press enter to use defaults):");
-  const workerName = (await prompt(`  Cloudflare Worker [${defaultWorkerName}]: `)) || defaultWorkerName;
-  const dbName = (await prompt(`  D1 database       [${defaultDbName}]: `)) || defaultDbName;
-  const bucketName = (await prompt(`  R2 bucket         [${defaultBucketName}]: `)) || defaultBucketName;
-  const editorName = (await prompt(`  Vercel project    [${defaultEditorName}]: `)) || defaultEditorName;
+  const workerName = (await prompt(`  Cloudflare Worker        [${defaultWorkerName}]: `)) || defaultWorkerName;
+  const dbName = (await prompt(`  D1 database              [${defaultDbName}]: `)) || defaultDbName;
+  const bucketName = (await prompt(`  R2 bucket                [${defaultBucketName}]: `)) || defaultBucketName;
+  const editorName = (await prompt(`  Cloudflare Pages project [${defaultEditorName}]: `)) || defaultEditorName;
 
   validateResourceName(workerName);
   validateResourceName(dbName);
@@ -301,8 +245,8 @@ async function main() {
     }
   }
 
-  // Update wrangler.toml
-  console.log("\nUpdating wrangler.toml...");
+  // Update api/wrangler.toml
+  console.log("\nUpdating api/wrangler.toml...");
   const tomlPath = path.join(API_DIR, "wrangler.toml");
   const tomlExamplePath = tomlPath + ".example";
   fs.copyFileSync(tomlExamplePath, tomlPath);
@@ -314,6 +258,16 @@ async function main() {
     .replace(/^bucket_name = ".*"$/m, `bucket_name = "${bucketName}"`)
     .replace(/^R2_PUBLIC_URL = ".*"$/m, `R2_PUBLIC_URL = "${r2PublicUrl}"`);
   fs.writeFileSync(tomlPath, toml);
+
+  // Update editor/wrangler.toml
+  console.log("Updating editor/wrangler.toml...");
+  const editorTomlPath = path.join(EDITOR_DIR, "wrangler.toml");
+  fs.copyFileSync(editorTomlPath + ".example", editorTomlPath);
+  let editorToml = fs.readFileSync(editorTomlPath, "utf8");
+  editorToml = editorToml
+    .replace(/^name = ".*"$/m, `name = "${editorName}"`)
+    .replace(/^service = ".*"$/m, `service = "${editorName}"`);
+  fs.writeFileSync(editorTomlPath, editorToml);
 
   // Apply schema
   console.log("\nApplying database schema...");
@@ -354,105 +308,47 @@ async function main() {
     process.exit(1);
   }
 
-  // Write editor/.env.local
+  // Write editor/.env.local with Worker URL (baked in at build time)
   const envPath = path.join(EDITOR_DIR, ".env.local");
-  if (workerUrl && !fs.existsSync(envPath)) {
+  if (workerUrl) {
     fs.writeFileSync(envPath, `NEXT_PUBLIC_API_URL=${workerUrl}\n`);
     console.log("\nCreated editor/.env.local");
   }
 
-  // Deploy editor to Vercel (initial deploy to create the project)
-  console.log("\nDeploying editor to Vercel...");
-  console.log("  Note: you may be prompted to select your Vercel account on first deploy.");
-  let vercelUrl;
+  // Build editor
+  console.log("\nBuilding editor for Cloudflare Workers...");
   try {
-    const vercelOutput = execSync(`vercel deploy --prod --yes --name ${editorName}`, {
+    execSync("npm run cf:build", {
+      cwd: EDITOR_DIR,
+      stdio: "inherit",
+    });
+  } catch (e) {
+    console.error("Editor build failed:", e.message);
+    process.exit(1);
+  }
+
+  // Deploy editor to Cloudflare Workers
+  console.log("\nDeploying editor to Cloudflare Workers...");
+  let editorUrl;
+  try {
+    const editorDeployOutput = execSync("npx wrangler deploy", {
       cwd: EDITOR_DIR,
       encoding: "utf8",
       stdio: ["inherit", "pipe", "pipe"],
     });
-    process.stdout.write(vercelOutput);
-    const urlMatch = stripAnsi(vercelOutput).match(/https:\/\/[^\s]+\.vercel\.app/);
-    vercelUrl = urlMatch ? urlMatch[0] : null;
-    if (vercelUrl) console.log(`Vercel URL: ${vercelUrl}`);
+    process.stdout.write(editorDeployOutput);
+    const urlMatch = stripAnsi(editorDeployOutput).match(/https:\/\/[^\s]+\.workers\.dev/);
+    editorUrl = urlMatch ? urlMatch[0] : null;
+    if (editorUrl) console.log(`Editor URL: ${editorUrl}`);
   } catch (e) {
-    console.error("Vercel deploy failed:", e.stderr || e.message);
+    console.error("Editor deploy failed:", e.stderr || e.message);
     process.exit(1);
   }
 
-  // Set NEXT_PUBLIC_API_URL on Vercel and redeploy
-  if (workerUrl) {
-    console.log("\nSetting Vercel environment variable...");
-    setVercelEnv("NEXT_PUBLIC_API_URL", workerUrl);
-
-    console.log("\nRedeploying editor to pick up env var...");
-    try {
-      const redeployOutput = execSync(`vercel deploy --prod --yes`, {
-        cwd: EDITOR_DIR,
-        encoding: "utf8",
-        stdio: ["inherit", "pipe", "pipe"],
-      });
-      process.stdout.write(redeployOutput);
-      const finalUrlMatch = stripAnsi(redeployOutput).match(/https:\/\/[^\s]+\.vercel\.app/);
-      if (finalUrlMatch) vercelUrl = finalUrlMatch[0];
-    } catch (e) {
-      console.error("Vercel redeploy failed:", e.stderr || e.message);
-      process.exit(1);
-    }
-  }
-
-  // Set root directory to editor/ so Git-triggered deploys build from the right place.
-  // Done after all CLI deploys to avoid Vercel resolving editor/editor for subsequent CLI runs.
-  console.log("\nConfiguring Vercel root directory...");
-  try {
-    const vercelProjectJson = path.join(EDITOR_DIR, ".vercel", "project.json");
-    const { projectId } = JSON.parse(fs.readFileSync(vercelProjectJson, "utf8"));
-    const token = getVercelToken();
-    if (!token) throw new Error("Could not find Vercel auth token.");
-    await setVercelRootDirectory(projectId, token);
-    console.log("Root directory set to editor/.");
-  } catch (e) {
-    console.log(`  Could not set root directory automatically: ${e.message}`);
-    console.log("  Set it manually in the Vercel dashboard: Project Settings -> General -> Root Directory -> editor");
-  }
-
-  // Connect GitHub repo to Vercel project for auto-deploy on push
-  if (vercelUrl) {
-    console.log("\nLinking GitHub repo to Vercel for auto-deploy...");
-    try {
-      const remoteUrl = execSync("git remote get-url origin", { cwd: ROOT_DIR, encoding: "utf8" }).trim();
-      const isGitHub = remoteUrl.includes("github.com");
-      if (!isGitHub) {
-        console.log("  Remote is not GitHub — skipping auto-link. Connect manually in the Vercel dashboard under Settings -> Git.");
-      } else {
-        let remotePushed = false;
-        try {
-          execSync("git ls-remote --exit-code origin HEAD", { cwd: ROOT_DIR, stdio: "pipe" });
-          remotePushed = true;
-        } catch {
-          remotePushed = false;
-        }
-        if (!remotePushed) {
-          console.log("  Warning: your GitHub repo does not appear to have been pushed yet.");
-          console.log("  Push it first (git push -u origin main), then run:");
-          console.log(`    vercel git connect ${remoteUrl}`);
-          console.log("  from the editor/ directory.");
-        } else {
-          execSync(`vercel git connect ${remoteUrl}`, { cwd: EDITOR_DIR, stdio: "inherit" });
-          console.log("GitHub repo linked.");
-        }
-      }
-    } catch {
-      console.log("  Could not auto-link. To set up auto-deploy on push:");
-      console.log("  1. Connect GitHub to your Vercel account: vercel.com/account/integrations");
-      console.log("  2. Then link the repo: Project Settings -> Git -> Connect Repository");
-    }
-  }
-
-  // Ask for production editor URL (may differ from Vercel preview URL if using a custom domain)
-  let prodEditorUrl = vercelUrl;
-  if (vercelUrl) {
-    const customUrl = await prompt(`\nProduction editor URL (press enter to use ${vercelUrl}): `);
+  // Ask for production editor URL (may differ if using a custom domain)
+  let prodEditorUrl = editorUrl;
+  if (editorUrl) {
+    const customUrl = await prompt(`\nProduction editor URL (press enter to use ${editorUrl}): `);
     if (customUrl) {
       if (!customUrl.startsWith("https://") && !customUrl.startsWith("http://")) {
         prodEditorUrl = "https://" + customUrl;
@@ -477,16 +373,10 @@ async function main() {
   console.log("\n-- Setup complete --");
   if (workerUrl) console.log(`Worker:  ${workerUrl}`);
   if (prodEditorUrl) console.log(`Editor:  ${prodEditorUrl}`);
-  console.log("\nNext: enable the GitHub Action for automatic Worker deploys on push:");
-  console.log("  1. Go to dash.cloudflare.com -> My Profile -> API Tokens -> Create Token");
-  console.log("  2. Use the 'Edit Cloudflare Workers' template");
-  console.log("  3. Add the token to your GitHub repo: Settings -> Secrets -> Actions");
-  console.log("     Name: CLOUDFLARE_API_TOKEN");
-  console.log("\nOptional: if you have a Vercel-hosted frontend that consumes this API,");
-  console.log("create a deploy hook in its Vercel dashboard (Settings -> Git -> Deploy Hooks)");
-  console.log("and set it as a secret on the Worker:");
-  console.log("  cd api && npx wrangler secret put VERCEL_DEPLOY_HOOK");
-  console.log("The API will trigger a rebuild whenever a post is published.");
+
+  console.log("\nOptional: trigger a frontend rebuild when a post is published.");
+  console.log("Create a deploy hook in your Cloudflare Pages, Vercel, or Netlify project, then:");
+  console.log("  cd api && npx wrangler secret put DEPLOY_HOOK");
 
   rl.close();
 }

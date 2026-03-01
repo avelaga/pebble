@@ -26,7 +26,7 @@ function contentPreview(html) {
 }
 
 async function triggerDeploy(env) {
-  const hook = env.VERCEL_DEPLOY_HOOK;
+  const hook = env.DEPLOY_HOOK;
   if (!hook) return;
   try {
     await fetch(hook, { method: "POST" });

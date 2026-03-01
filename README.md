@@ -5,13 +5,13 @@ A minimalist self-hosted headless blog CMS. Runs entirely on free tiers - no ser
 <img src="https://i.imgur.com/rq5lrhG.png"/>
 <img src="https://i.imgur.com/eUlTOXo.png"/>
 
-Most headless CMS platforms require a live server (Ghost, Strapi, Payload all need a VPS at ~$6–12/month minimum). Pebble runs on Cloudflare Workers, D1, and R2 - meaning it deploys globally, scales automatically, and costs nothing on free tiers. A single setup script handles everything end-to-end.
+Most headless CMS platforms require a live server (Ghost, Strapi, Payload all need a VPS at ~$6–12/month minimum). Pebble runs entirely on Cloudflare — Workers, D1, R2, and Pages — meaning it deploys globally, scales automatically, and costs nothing on free tiers. A single setup script handles everything end-to-end.
 
 ## Features
 
 - **REST API** - clean endpoints for posts, slugs, tags, and image uploads
 - **Draft / publish workflow** - public reads return only published posts; authenticated reads include drafts
-- **Auto-deploy on publish** - optional Vercel deploy hook triggers a frontend rebuild whenever you publish a post, making it a first-class citizen in any SSG workflow (Next.js, Astro, SvelteKit, etc.)
+- **Auto-deploy on publish** - optional deploy hook triggers a frontend rebuild whenever you publish a post, making it a first-class citizen in any SSG workflow (Next.js, Astro, SvelteKit, etc.)
 - **Image uploads** - stored in R2, served from a public URL, no egress fees
 - **SEO fields** - title, description, and OG fields baked in
 - **Tags** - lightweight taxonomy, no configuration needed
@@ -26,9 +26,6 @@ Most headless CMS platforms require a live server (Ghost, Strapi, Payload all ne
 
 - [Node.js](https://nodejs.org/) 18.18+
 - [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier is enough)
-- [Vercel account](https://vercel.com/signup) (free tier is enough)
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/): `npm install -g wrangler && wrangler login`
-- [Vercel CLI](https://vercel.com/docs/cli): `npm install -g vercel && vercel login`
 
 ### Run the setup script
 ```bash
@@ -42,7 +39,7 @@ Handles the full deployment end-to-end: creates Cloudflare resources, applies th
 **`--prefix`** - Namespaces all resources so multiple instances can coexist on the same account.
 ```bash
 node scripts/setup.js --prefix=my-site
-# creates: my-site-pebble-api, my-site-pebble-db, my-site-pebble-images
+# creates: my-site-pebble-api, my-site-pebble-db, my-site-pebble-images, my-site-pebble-editor
 ```
 
 ---
@@ -97,7 +94,7 @@ api/
 | `JWT_SECRET` | Random string for signing JWTs |
 | `EDITOR_USERNAME` | Editor login username |
 | `EDITOR_PASSWORD_HASH` | bcrypt hash of editor password |
-| `VERCEL_DEPLOY_HOOK` | Vercel deploy hook URL (optional) |
+| `DEPLOY_HOOK` | Deploy hook URL to trigger frontend rebuilds (optional) |
 
 **Vars** (`wrangler.toml`):
 
@@ -111,10 +108,6 @@ api/
 cd api && npx wrangler deploy
 ```
 
-### Auto-deploy on push
-
-`.github/workflows/deploy-api.yml` redeploys the Worker on pushes to `main` that touch `api/`. Add a `CLOUDFLARE_API_TOKEN` secret to your GitHub repo (create one from the "Edit Cloudflare Workers" template in the Cloudflare dashboard).
-
 ### Reset credentials
 ```bash
 cd api && npm run reset-password
@@ -124,7 +117,7 @@ cd api && npm run reset-password
 
 ## Editor
 
-Next.js editor UI (App Router). Uses Tiptap for rich text editing, JWT for auth.
+Next.js editor UI deployed to [Cloudflare Workers](https://workers.cloudflare.com/) via [OpenNext](https://opennext.js.org/cloudflare). Uses Tiptap for rich text editing, JWT for auth.
 
 **Features:** create/edit/delete posts, publish or draft, tags, SEO fields, image upload.
 
@@ -132,11 +125,13 @@ Next.js editor UI (App Router). Uses Tiptap for rich text editing, JWT for auth.
 
 | Var | Description |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | URL of your deployed Cloudflare Worker |
+| `NEXT_PUBLIC_API_URL` | URL of your deployed Cloudflare Worker (baked in at build time) |
 
 ### Deploy
 ```bash
-cd editor && vercel --prod
+cd editor
+npm install && npm run cf:build
+npx wrangler deploy
 ```
 
 ---
@@ -163,9 +158,13 @@ Make sure `http://localhost:3000` is in `CORS_ORIGINS` in `wrangler.toml`.
 
 ---
 
-## Vercel deploy hook
+## Deploy hook
 
-Set `VERCEL_DEPLOY_HOOK` as a Worker secret to trigger a Vercel rebuild whenever a post is published. This makes Pebble work seamlessly as a content source for statically generated frontends - publish a post, your site rebuilds automatically.
+Set `DEPLOY_HOOK` as a Worker secret to trigger a rebuild of your frontend whenever a post is published. Works with any platform that supports deploy hooks — Cloudflare Pages, Vercel, Netlify, etc.
+
+```bash
+cd api && npx wrangler secret put DEPLOY_HOOK
+```
 
 ---
 
@@ -173,6 +172,6 @@ Set `VERCEL_DEPLOY_HOOK` as a Worker secret to trigger a Vercel rebuild whenever
 
 Pebble is intentionally single-editor. If you need multi-author support, fork it.
 
-JWT tokens are stored in localStorage. This is a deliberate trade-off: httpOnly cookies don't work cleanly cross-origin between Vercel and Cloudflare, and for a personal CMS the attack surface is minimal.
+JWT tokens are stored in localStorage. This is a deliberate trade-off: httpOnly cookies don't work cleanly cross-origin between Cloudflare Pages and Workers, and for a personal CMS the attack surface is minimal.
 
-Pebble runs on Cloudflare and Vercel free tiers, which are subject to change. Current limits are well above what any blog will realistically hit.
+Pebble runs on Cloudflare free tiers, which are subject to change. Current limits are well above what any blog will realistically hit.

@@ -1,4 +1,4 @@
 JWT_SECRET=your-jwt-secret-here
 EDITOR_USERNAME=your-editor-username
 EDITOR_PASSWORD_HASH=your-bcrypt-password-hash
-VERCEL_DEPLOY_HOOK=your-vercel-deploy-hook-url
+DEPLOY_HOOK=your-deploy-hook-url

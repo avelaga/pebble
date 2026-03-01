@@ -20,9 +20,12 @@ node_modules/
 
 # cloudflare
 .wrangler/
+.open-next/
 api/wrangler.toml
+editor/wrangler.toml
+editor/wrangler.jsonc
 
-# vercel
+# vercel (used by opennextjs-cloudflare build output)
 .vercel/
 
 # production builds
