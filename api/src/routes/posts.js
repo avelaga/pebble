@@ -20,6 +20,11 @@ function parseTagsList(posts) {
   return posts.map(parseTags);
 }
 
+function contentPreview(html) {
+  const text = html.replace(/<[^>]*>/g, "").trim();
+  return text.length > 100 ? text.slice(0, 100) + "..." : text;
+}
+
 async function triggerDeploy(env) {
   const hook = env.VERCEL_DEPLOY_HOOK;
   if (!hook) return;
@@ -71,7 +76,7 @@ postRoutes.get("/", optionalAuth, async (c) => {
 
     const rows = await db
       .prepare(
-        `SELECT id, title, slug, status, tags, meta_description, created_at, updated_at
+        `SELECT id, title, slug, status, tags, meta_description, og_image, content, created_at, updated_at
          FROM posts ${whereClause}
          ORDER BY created_at DESC
          LIMIT ? OFFSET ?`
@@ -79,8 +84,14 @@ postRoutes.get("/", optionalAuth, async (c) => {
       .bind(...params, safeLimit, offset)
       .all();
 
+    const posts = parseTagsList(rows.results).map((p) => {
+      const preview = contentPreview(p.content);
+      delete p.content;
+      return { ...p, content_preview: preview };
+    });
+
     return c.json({
-      posts: parseTagsList(rows.results),
+      posts,
       pagination: {
         page: parseInt(page),
         limit: safeLimit,
@@ -135,7 +146,7 @@ postRoutes.get("/by-tag/:tag", async (c) => {
 
     const rows = await db
       .prepare(
-        `SELECT id, title, slug, status, tags, meta_description, created_at, updated_at
+        `SELECT id, title, slug, status, tags, meta_description, og_image, content, created_at, updated_at
          FROM posts WHERE status = 'published' AND tags LIKE ?
          ORDER BY created_at DESC
          LIMIT ? OFFSET ?`
@@ -143,9 +154,15 @@ postRoutes.get("/by-tag/:tag", async (c) => {
       .bind(tagPattern, safeLimit, offset)
       .all();
 
+    const posts = parseTagsList(rows.results).map((p) => {
+      const preview = contentPreview(p.content);
+      delete p.content;
+      return { ...p, content_preview: preview };
+    });
+
     return c.json({
       tag,
-      posts: parseTagsList(rows.results),
+      posts,
       pagination: {
         page: parseInt(page),
         limit: safeLimit,

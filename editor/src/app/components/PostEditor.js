@@ -17,8 +17,10 @@ export default function PostEditor({ post }) {
   const [metaDescription, setMetaDescription] = useState(post?.meta_description || "");
   const [ogImage, setOgImage] = useState(post?.og_image || "");
   const [saving, setSaving] = useState(false);
+  const [ogImageUploading, setOgImageUploading] = useState(false);
   const [message, setMessage] = useState("");
   const fileInputRef = useRef(null);
+  const ogImageInputRef = useRef(null);
 
   const editor = useEditor({
     extensions: [StarterKit, Image],
@@ -106,6 +108,36 @@ export default function PostEditor({ post }) {
       setMessage("");
     } catch (err) {
       setMessage(`Error: ${err.message}`);
+    }
+
+    e.target.value = "";
+  }
+
+  async function handleOgImageUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      setOgImageUploading(true);
+      const res = await authFetch(`${API_URL}/api/uploads`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Upload failed");
+      }
+
+      const { url } = await res.json();
+      setOgImage(url);
+    } catch (err) {
+      setMessage(`Error: ${err.message}`);
+    } finally {
+      setOgImageUploading(false);
     }
 
     e.target.value = "";
@@ -221,14 +253,37 @@ export default function PostEditor({ post }) {
         </label>
 
         <label>
-          OG Image URL
-          <input
-            type="text"
-            value={ogImage}
-            onChange={(e) => setOgImage(e.target.value)}
-            placeholder="https://example.com/image.jpg"
-            className="meta-input"
-          />
+          OG Image
+          <div>
+            <button
+              type="button"
+              onClick={() => ogImageInputRef.current?.click()}
+              disabled={ogImageUploading}
+              className="meta-input"
+              style={{ cursor: "pointer", display: "inline-block", width: "auto" }}
+            >
+              {ogImageUploading ? "Uploading..." : ogImage ? "Replace image" : "Upload image"}
+            </button>
+            <input
+              type="file"
+              ref={ogImageInputRef}
+              onChange={handleOgImageUpload}
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              style={{ display: "none" }}
+            />
+            {ogImage && (
+              <div style={{ marginTop: "8px" }}>
+                <img src={ogImage} alt="OG preview" style={{ maxHeight: "120px", borderRadius: "4px" }} />
+                <button
+                  type="button"
+                  onClick={() => setOgImage("")}
+                  style={{ display: "block", marginTop: "4px", background: "none", border: "none", cursor: "pointer", color: "inherit", opacity: 0.6, padding: 0, fontSize: "0.85em" }}
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+          </div>
         </label>
       </div>
 
