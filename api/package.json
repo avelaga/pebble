@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "hash-password": "node scripts/hash-password.js"
+    "reset-password": "node scripts/reset-password.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

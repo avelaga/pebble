@@ -44,7 +44,7 @@ api/
 ├── wrangler.toml              # Cloudflare config, bindings, vars
 ├── schema.sql                 # D1 database schema
 ├── scripts/
-│   └── hash-password.js       # Utility to generate bcrypt hashes
+│   └── reset-password.js       # Utility to generate bcrypt hashes and push to cloudflare
 └── src/
     ├── index.js               # Hono app, middleware, route mounting
     ├── routes/
@@ -105,8 +105,7 @@ cd api && npx wrangler deploy
 
 ```bash
 cd api
-node scripts/hash-password.js yournewpassword
-npx wrangler secret put EDITOR_PASSWORD_HASH
+node scripts/reset-password.js yournewpassword
 ```
 
 ---

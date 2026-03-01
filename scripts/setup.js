@@ -325,25 +325,13 @@ async function main() {
   // Editor credentials
   console.log("\nCreate your editor account:");
   const editorUsername = await prompt("Username: ");
-  let editorPassword;
-  while (true) {
-    editorPassword = await prompt("Password: ");
-    const editorPasswordConfirm = await prompt("Confirm password: ");
-    if (editorPassword === editorPasswordConfirm) break;
-    console.log("  Passwords do not match. Try again.");
-  }
 
-  // Hash password
-  const hashResult = spawnSync("node", ["scripts/hash-password.js", editorPassword], {
+  // Set password (hashes and pushes to Cloudflare)
+  const passwordResult = spawnSync("node", ["scripts/reset-password.js"], {
     cwd: API_DIR,
-    encoding: "utf8",
-    stdio: ["inherit", "pipe", "pipe"],
+    stdio: "inherit",
   });
-  if (hashResult.status !== 0) {
-    console.error("Failed to hash password:", hashResult.stderr);
-    process.exit(1);
-  }
-  const passwordHash = hashResult.stdout.trim();
+  if (passwordResult.status !== 0) process.exit(1);
 
   // Generate JWT secret
   const jwtSecret = crypto.randomBytes(32).toString("hex");
@@ -352,7 +340,6 @@ async function main() {
   console.log("\nSetting Cloudflare secrets...");
   setSecret("JWT_SECRET", jwtSecret);
   setSecret("EDITOR_USERNAME", editorUsername);
-  setSecret("EDITOR_PASSWORD_HASH", passwordHash);
 
   // Deploy Worker
   console.log("\nDeploying Worker...");
