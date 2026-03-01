@@ -1,15 +1,29 @@
 # pebble
 
-A minimalist, self-hosted headless blog CMS built on serverless infrastructure and that runs entirely on free tiers.
+A minimalist self-hosted headless blog CMS. Runs entirely on free tiers - no server, no monthly bill.
 
 <img src="https://i.imgur.com/rq5lrhG.png"/>
 <img src="https://i.imgur.com/eUlTOXo.png"/>
 
----
+Most headless CMS platforms require a live server (Ghost, Strapi, Payload all need a VPS at ~$6–12/month minimum). Pebble runs on Cloudflare Workers, D1, and R2 - meaning it deploys globally, scales automatically, and costs nothing on free tiers. A single setup script handles everything end-to-end.
+
+## Features
+
+- **REST API** - clean endpoints for posts, slugs, tags, and image uploads
+- **Draft / publish workflow** - public reads return only published posts; authenticated reads include drafts
+- **Auto-deploy on publish** - optional Vercel deploy hook triggers a frontend rebuild whenever you publish a post, making it a first-class citizen in any SSG workflow (Next.js, Astro, SvelteKit, etc.)
+- **Image uploads** - stored in R2, served from a public URL, no egress fees
+- **SEO fields** - title, description, and OG fields baked in
+- **Tags** - lightweight taxonomy, no configuration needed
+- **JWT auth** - 7-day tokens, bcrypt-hashed credentials stored as Cloudflare secrets
+- **HTML sanitization** - safe rich text output from the editor
+- **Multi-instance support** - namespace all resources with `--prefix` to run multiple sites on one account
+- **One-command setup** - full deployment automated via a single script
 
 ## Getting started
 
 ### Prerequisites
+
 - [Node.js](https://nodejs.org/) 18.18+
 - [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier is enough)
 - [Vercel account](https://vercel.com/signup) (free tier is enough)
@@ -17,7 +31,6 @@ A minimalist, self-hosted headless blog CMS built on serverless infrastructure a
 - [Vercel CLI](https://vercel.com/docs/cli): `npm install -g vercel && vercel login`
 
 ### Run the setup script
-
 ```bash
 node scripts/setup.js
 ```
@@ -27,7 +40,6 @@ Handles the full deployment end-to-end: creates Cloudflare resources, applies th
 #### Options
 
 **`--prefix`** - Namespaces all resources so multiple instances can coexist on the same account.
-
 ```bash
 node scripts/setup.js --prefix=my-site
 # creates: my-site-pebble-api, my-site-pebble-db, my-site-pebble-images
@@ -35,30 +47,11 @@ node scripts/setup.js --prefix=my-site
 
 ---
 
-## api/
+## API
 
 Cloudflare Worker built with [Hono](https://hono.dev/). Uses D1 (SQLite) for posts and R2 for image storage. Auth is JWT + bcrypt.
 
-```
-api/
-├── wrangler.toml              # Cloudflare config, bindings, vars
-├── schema.sql                 # D1 database schema
-├── scripts/
-│   └── reset-password.js       # Interactive password reset — prompts, hashes, and updates Cloudflare secret
-└── src/
-    ├── index.js               # Hono app, middleware, route mounting
-    ├── routes/
-    │   ├── auth.js            # POST /api/auth/login
-    │   ├── posts.js           # CRUD for posts
-    │   └── uploads.js         # Image upload to R2
-    ├── middleware/
-    │   └── auth.js            # JWT verification
-    └── utils/
-        ├── slug.js            # Title → URL slug
-        └── sanitize.js        # HTML sanitization
-```
-
-### API Endpoints
+### Endpoints
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -73,9 +66,31 @@ api/
 | POST | `/api/uploads` | Required | Upload image (JPEG/PNG/GIF/WebP, max 5MB) |
 | GET | `/health` | - | Health check |
 
+Auth is optional on `GET /api/posts` - unauthenticated requests return only published posts, authenticated requests include drafts.
+
+### Project structure
+```
+api/
+├── wrangler.toml              # Cloudflare config, bindings, vars
+├── schema.sql                 # D1 database schema
+├── scripts/
+│   └── reset-password.js      # Interactive password reset
+└── src/
+    ├── index.js               # Hono app, middleware, route mounting
+    ├── routes/
+    │   ├── auth.js            # POST /api/auth/login
+    │   ├── posts.js           # CRUD for posts
+    │   └── uploads.js         # Image upload to R2
+    ├── middleware/
+    │   └── auth.js            # JWT verification
+    └── utils/
+        ├── slug.js            # Title → URL slug
+        └── sanitize.js        # HTML sanitization
+```
+
 ### Environment
 
-**Secrets** (`wrangler secret put`):
+**Secrets** (set via `wrangler secret put`):
 
 | Secret | Description |
 |---|---|
@@ -91,8 +106,7 @@ api/
 | `CORS_ORIGINS` | Comma-separated allowed origins |
 | `R2_PUBLIC_URL` | Public base URL for your R2 bucket |
 
-### Deployment
-
+### Deploy
 ```bash
 cd api && npx wrangler deploy
 ```
@@ -101,17 +115,16 @@ cd api && npx wrangler deploy
 
 `.github/workflows/deploy-api.yml` redeploys the Worker on pushes to `main` that touch `api/`. Add a `CLOUDFLARE_API_TOKEN` secret to your GitHub repo (create one from the "Edit Cloudflare Workers" template in the Cloudflare dashboard).
 
-### Updating credentials
-
+### Reset credentials
 ```bash
 cd api && npm run reset-password
 ```
 
 ---
 
-## editor/
+## Editor
 
-Next.js editor UI (App Router). Uses Tiptap for rich text editing, JWT in localStorage for auth.
+Next.js editor UI (App Router). Uses Tiptap for rich text editing, JWT for auth.
 
 **Features:** create/edit/delete posts, publish or draft, tags, SEO fields, image upload.
 
@@ -121,8 +134,7 @@ Next.js editor UI (App Router). Uses Tiptap for rich text editing, JWT in localS
 |---|---|
 | `NEXT_PUBLIC_API_URL` | URL of your deployed Cloudflare Worker |
 
-### Deployment
-
+### Deploy
 ```bash
 cd editor && vercel --prod
 ```
@@ -153,8 +165,14 @@ Make sure `http://localhost:3000` is in `CORS_ORIGINS` in `wrangler.toml`.
 
 ## Vercel deploy hook
 
-Set `VERCEL_DEPLOY_HOOK` as a Worker secret to trigger a Vercel rebuild whenever a post is published. Useful for statically generated frontends.
+Set `VERCEL_DEPLOY_HOOK` as a Worker secret to trigger a Vercel rebuild whenever a post is published. This makes Pebble work seamlessly as a content source for statically generated frontends - publish a post, your site rebuilds automatically.
 
 ---
 
-last updated 2.28.26
+## Notes
+
+Pebble is intentionally single-editor. If you need multi-author support, fork it.
+
+JWT tokens are stored in localStorage. This is a deliberate trade-off: httpOnly cookies don't work cleanly cross-origin between Vercel and Cloudflare, and for a personal CMS the attack surface is minimal.
+
+Pebble runs on Cloudflare and Vercel free tiers, which are subject to change. Current limits are well above what any blog will realistically hit.
