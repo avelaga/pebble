@@ -92,7 +92,7 @@ export default function PostList() {
                   ))}
                 </div>
               </td>
-              <td>{new Date(post.created_at).toLocaleDateString()}</td>
+              <td>{new Date(post.created_at + "Z").toLocaleDateString()}</td>
               <td>
                 <div className="table-actions">
                   <Link href={`/posts/${post.id}/edit`}>Edit</Link>
