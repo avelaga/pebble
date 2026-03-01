@@ -5,7 +5,7 @@ A minimalist self-hosted headless blog CMS. Runs entirely on free tiers - no ser
 <img src="https://i.imgur.com/rq5lrhG.png"/>
 <img src="https://i.imgur.com/eUlTOXo.png"/>
 
-Most headless CMS platforms require a live server (Ghost, Strapi, Payload all need a VPS at ~$6–12/month minimum). Pebble runs entirely on Cloudflare — Workers, D1, R2, and Pages — meaning it deploys globally, scales automatically, and costs nothing on free tiers. A single setup script handles everything end-to-end.
+Most headless CMS platforms require a live server (Ghost, Strapi, Payload all need a VPS at ~$6–12/month minimum). Pebble runs entirely on Cloudflare - Workers, D1, R2, and Pages - meaning it deploys globally, scales automatically, and costs nothing on free tiers. A single setup script handles everything end-to-end.
 
 ## Features
 
@@ -160,7 +160,7 @@ Make sure `http://localhost:3000` is in `CORS_ORIGINS` in `wrangler.toml`.
 
 ## Deploy hook
 
-Set `DEPLOY_HOOK` as a Worker secret to trigger a rebuild of your frontend whenever a post is published. Works with any platform that supports deploy hooks — Cloudflare Pages, Vercel, Netlify, etc.
+Set `DEPLOY_HOOK` as a Worker secret to trigger a rebuild of your frontend whenever a post is published. Works with any platform that supports deploy hooks - Cloudflare Pages, Vercel, Netlify, etc.
 
 ```bash
 cd api && npx wrangler secret put DEPLOY_HOOK
