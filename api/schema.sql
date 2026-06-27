@@ -10,3 +10,9 @@ CREATE TABLE IF NOT EXISTS posts (
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+-- Key/value store for site metadata (e.g. last content change vs last deploy)
+CREATE TABLE IF NOT EXISTS meta (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);

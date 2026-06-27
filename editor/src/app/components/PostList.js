@@ -36,6 +36,7 @@ export default function PostList() {
     try {
       const res = await authFetch(`${API_URL}/api/posts/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete");
+      window.dispatchEvent(new Event("pebble:content-changed"));
       fetchPosts(page);
     } catch (err) {
       console.error("Failed to delete post:", err);
@@ -51,6 +52,7 @@ export default function PostList() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) throw new Error("Failed to update status");
+      window.dispatchEvent(new Event("pebble:content-changed"));
       fetchPosts(page);
     } catch (err) {
       console.error("Failed to update post status:", err);

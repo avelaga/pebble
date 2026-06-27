@@ -359,10 +359,14 @@ async function main() {
   }
 
   // Update CORS_ORIGINS with editor URL and redeploy Worker
-  if (prodEditorUrl) {
+  if (editorUrl) {
     console.log("\nUpdating CORS_ORIGINS...");
+    const corsOrigins = [editorUrl];
+    if (prodEditorUrl && prodEditorUrl !== editorUrl) corsOrigins.push(prodEditorUrl);
+    corsOrigins.push("http://localhost:3000");
+
     let updatedToml = fs.readFileSync(tomlPath, "utf8");
-    updatedToml = updatedToml.replace(/^CORS_ORIGINS = ".*"$/m, `CORS_ORIGINS = "${prodEditorUrl},http://localhost:3000"`);
+    updatedToml = updatedToml.replace(/^CORS_ORIGINS = ".*"$/m, `CORS_ORIGINS = "${corsOrigins.join(",")}"`);
     fs.writeFileSync(tomlPath, updatedToml);
 
     console.log("\nRedeploying Worker with updated CORS...");

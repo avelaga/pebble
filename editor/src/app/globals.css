@@ -296,6 +296,47 @@ button:disabled {
   color: var(--foreground);
 }
 
+/* Rebuild control */
+.rebuild-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.rebuild-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+}
+.rebuild-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.rebuild-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.build-status {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.build-status.building,
+.build-status.queued,
+.build-status.initializing {
+  color: var(--accent);
+}
+.build-status.ready {
+  color: var(--success);
+}
+.build-status.error,
+.build-status.canceled {
+  color: #d33;
+}
+.build-status.dirty {
+  color: #d97706;
+}
+
 /* Page header with back link */
 .page-header {
   margin-bottom: 1.5rem;

@@ -4,6 +4,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { authRoutes } from "./routes/auth";
 import { postRoutes } from "./routes/posts";
 import { uploadRoutes } from "./routes/uploads";
+import { deployRoutes } from "./routes/deploy";
 
 const app = new Hono();
 
@@ -30,6 +31,7 @@ app.use(
 app.route("/api/auth", authRoutes);
 app.route("/api/posts", postRoutes);
 app.route("/api/uploads", uploadRoutes);
+app.route("/api/deploy", deployRoutes);
 
 // Health check
 app.get("/health", (c) => c.json({ status: "ok" }));

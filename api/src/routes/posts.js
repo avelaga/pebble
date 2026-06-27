@@ -25,15 +25,14 @@ function contentPreview(html) {
   return text.length > 100 ? text.slice(0, 100) + "..." : text;
 }
 
-async function triggerDeploy(env) {
-  const hook = env.DEPLOY_HOOK;
-  if (!hook) return;
-  try {
-    await fetch(hook, { method: "POST" });
-    console.log("Deploy webhook triggered");
-  } catch (err) {
-    console.error("Failed to trigger deploy webhook:", err);
-  }
+// Record that content changed, so the editor can flag "not yet deployed"
+async function touchContent(db) {
+  await db
+    .prepare(
+      `INSERT INTO meta (key, value) VALUES ('content_changed_at', datetime('now'))
+       ON CONFLICT(key) DO UPDATE SET value = datetime('now')`
+    )
+    .run();
 }
 
 // GET /api/posts - list posts with pagination and tag filter
@@ -226,10 +225,8 @@ postRoutes.post("/", auth, async (c) => {
       )
       .first();
 
+    await touchContent(db);
     const post = parseTags(result);
-    if (post.status === "published") {
-      c.executionCtx.waitUntil(triggerDeploy(c.env));
-    }
     return c.json(post, 201);
   } catch (err) {
     if (err.message && err.message.includes("UNIQUE")) {
@@ -296,10 +293,8 @@ postRoutes.put("/:id", auth, async (c) => {
       return c.json({ error: "Post not found" }, 404);
     }
 
+    await touchContent(db);
     const post = parseTags(result);
-    if (post.status === "published") {
-      c.executionCtx.waitUntil(triggerDeploy(c.env));
-    }
     return c.json(post);
   } catch (err) {
     console.error("Error updating post:", err);
@@ -320,6 +315,7 @@ postRoutes.delete("/:id", auth, async (c) => {
     if (!result) {
       return c.json({ error: "Post not found" }, 404);
     }
+    await touchContent(db);
     return c.json({ message: "Post deleted" });
   } catch (err) {
     console.error("Error deleting post:", err);

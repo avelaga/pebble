@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import PostList from "./components/PostList";
+import RebuildButton from "./components/RebuildButton";
 import { useAuth } from "./components/AuthProvider";
 
 export default function Home() {
@@ -12,6 +13,7 @@ export default function Home() {
       <div className="header">
         <h1>Pebble Editor</h1>
         <div className="header-actions">
+          <RebuildButton />
           <Link href="/posts/new" className="new-post-btn">
             + New Post
           </Link>
