@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { auth, optionalAuth } from "../middleware/auth";
 import { toSlug } from "../utils/slug";
-import { sanitizeHtml } from "../utils/sanitize";
 
 export const postRoutes = new Hono();
 
@@ -21,7 +20,13 @@ function parseTagsList(posts) {
 }
 
 function contentPreview(html) {
-  const text = html.replace(/<[^>]*>/g, "").trim();
+  const text = html
+    // Drop <style>/<script>/<head> blocks so full HTML documents don't leak
+    // CSS or metadata into the preview.
+    .replace(/<(style|script|head)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   return text.length > 100 ? text.slice(0, 100) + "..." : text;
 }
 
@@ -75,7 +80,7 @@ postRoutes.get("/", optionalAuth, async (c) => {
 
     const rows = await db
       .prepare(
-        `SELECT id, title, slug, status, tags, meta_description, og_image, content, created_at, updated_at
+        `SELECT id, title, subtitle, preview_text, author, format, slug, status, tags, meta_description, og_image, content, created_at, updated_at
          FROM posts ${whereClause}
          ORDER BY created_at DESC
          LIMIT ? OFFSET ?`
@@ -145,7 +150,7 @@ postRoutes.get("/by-tag/:tag", async (c) => {
 
     const rows = await db
       .prepare(
-        `SELECT id, title, slug, status, tags, meta_description, og_image, content, created_at, updated_at
+        `SELECT id, title, subtitle, preview_text, author, format, slug, status, tags, meta_description, og_image, content, created_at, updated_at
          FROM posts WHERE status = 'published' AND tags LIKE ?
          ORDER BY created_at DESC
          LIMIT ? OFFSET ?`
@@ -199,7 +204,7 @@ postRoutes.get("/:id", async (c) => {
 postRoutes.post("/", auth, async (c) => {
   try {
     const db = c.env.DB;
-    const { title, content, status, tags, meta_description, og_image } =
+    const { title, subtitle, preview_text, author, format, content, status, tags, meta_description, og_image } =
       await c.req.json();
 
     if (!title || !content) {
@@ -207,16 +212,19 @@ postRoutes.post("/", auth, async (c) => {
     }
 
     const slug = toSlug(title);
-    const cleanContent = sanitizeHtml(content);
 
     const result = await db
       .prepare(
-        `INSERT INTO posts (title, content, slug, status, tags, meta_description, og_image)
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`
+        `INSERT INTO posts (title, subtitle, preview_text, author, format, content, slug, status, tags, meta_description, og_image)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
       )
       .bind(
         title,
-        cleanContent,
+        subtitle || "",
+        preview_text || "",
+        author || "",
+        format === "html" ? "html" : "rich",
+        content,
         slug,
         status || "draft",
         JSON.stringify(tags || []),
@@ -242,7 +250,7 @@ postRoutes.put("/:id", auth, async (c) => {
   try {
     const db = c.env.DB;
     const id = c.req.param("id");
-    const { title, content, status, tags, meta_description, og_image } =
+    const { title, subtitle, preview_text, author, format, content, status, tags, meta_description, og_image } =
       await c.req.json();
 
     const fields = [];
@@ -254,9 +262,25 @@ postRoutes.put("/:id", auth, async (c) => {
       fields.push("slug = ?");
       values.push(toSlug(title));
     }
+    if (subtitle !== undefined) {
+      fields.push("subtitle = ?");
+      values.push(subtitle);
+    }
+    if (preview_text !== undefined) {
+      fields.push("preview_text = ?");
+      values.push(preview_text);
+    }
+    if (format !== undefined) {
+      fields.push("format = ?");
+      values.push(format === "html" ? "html" : "rich");
+    }
+    if (author !== undefined) {
+      fields.push("author = ?");
+      values.push(author);
+    }
     if (content !== undefined) {
       fields.push("content = ?");
-      values.push(sanitizeHtml(content));
+      values.push(content);
     }
     if (status !== undefined) {
       fields.push("status = ?");

@@ -11,12 +11,13 @@ Most headless CMS platforms require a live server (Ghost, Strapi, Payload all ne
 
 - **REST API** - clean endpoints for posts, slugs, tags, and image uploads
 - **Draft / publish workflow** - public reads return only published posts; authenticated reads include drafts
+- **Rich text or raw HTML** - write posts in a Tiptap rich-text editor or hand-author raw HTML; the format is chosen per post and locked once created so content is never mangled by a conversion
+- **Post metadata** - subtitle, author, and custom preview-text fields alongside title, body, and tags
 - **Auto-deploy on publish** - optional deploy hook triggers a frontend rebuild whenever you publish a post, making it a first-class citizen in any SSG workflow (Next.js, Astro, SvelteKit, etc.)
 - **Image uploads** - stored in R2, served from a public URL, no egress fees
 - **SEO fields** - title, description, and OG fields baked in
 - **Tags** - lightweight taxonomy, no configuration needed
 - **JWT auth** - 7-day tokens, bcrypt-hashed credentials stored as Cloudflare secrets
-- **HTML sanitization** - safe rich text output from the editor
 - **Multi-instance support** - namespace all resources with `--prefix` to run multiple sites on one account
 - **One-command setup** - full deployment automated via a single script
 
@@ -65,6 +66,23 @@ Cloudflare Worker built with [Hono](https://hono.dev/). Uses D1 (SQLite) for pos
 
 Auth is optional on `GET /api/posts` - unauthenticated requests return only published posts, authenticated requests include drafts.
 
+### Post fields
+
+| Field | Description |
+|---|---|
+| `title` | Post title (required); the slug is derived from it |
+| `content` | Post body — rich-text HTML or a raw HTML document, depending on `format` |
+| `format` | `rich` (Tiptap rich text) or `html` (raw HTML). Defaults to `rich`; set on create and not meant to change afterward |
+| `subtitle` | Optional subtitle |
+| `author` | Optional author name |
+| `preview_text` | Optional excerpt shown in blog lists; falls back to an auto-generated preview when empty |
+| `status` | `draft` or `published` |
+| `tags` | Array of tag strings |
+| `meta_description` | SEO meta description |
+| `og_image` | Header / Open Graph image URL |
+
+> **Note:** post content is stored as-authored and is **not** sanitized server-side. Since Pebble is single-editor, the raw-HTML mode intentionally trusts the author. If you expose the editor more widely, sanitize on render.
+
 ### Project structure
 ```
 api/
@@ -81,8 +99,7 @@ api/
     ├── middleware/
     │   └── auth.js            # JWT verification
     └── utils/
-        ├── slug.js            # Title → URL slug
-        └── sanitize.js        # HTML sanitization
+        └── slug.js            # Title → URL slug
 ```
 
 ### Environment
@@ -119,7 +136,7 @@ cd api && npm run reset-password
 
 Next.js editor UI deployed to [Cloudflare Workers](https://workers.cloudflare.com/) via [OpenNext](https://opennext.js.org/cloudflare). Uses Tiptap for rich text editing, JWT for auth.
 
-**Features:** create/edit/delete posts, publish or draft, tags, SEO fields, image upload.
+**Features:** create/edit/delete posts, publish or draft, rich-text or raw-HTML authoring, subtitle / author / preview-text fields, tags, SEO fields, image upload.
 
 ### Environment
 

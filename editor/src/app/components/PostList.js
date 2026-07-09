@@ -72,6 +72,7 @@ export default function PostList() {
         <thead>
           <tr>
             <th>Title</th>
+            <th>Author</th>
             <th>Status</th>
             <th>Tags</th>
             <th>Created</th>
@@ -82,6 +83,7 @@ export default function PostList() {
           {posts.map((post) => (
             <tr key={post.id}>
               <td>{post.title}</td>
+              <td>{post.author || "—"}</td>
               <td>
                 <span className={`status-badge ${post.status}`}>
                   {post.status}

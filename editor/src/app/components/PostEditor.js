@@ -9,24 +9,64 @@ import { useAuth } from "./AuthProvider";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
+// A post is HTML-authored if it's a full HTML document. Used as a fallback for
+// legacy posts saved before the `format` field existed.
+function isFullDocument(html) {
+  return /<!doctype\s+html|<html[\s>]/i.test(html || "");
+}
+
+// The editing mode a post was authored in. Once set it never changes —
+// converting HTML <-> rich text mangles content, so the toggle is locked
+// for existing posts.
+function postMode(post) {
+  if (!post) return "rich";
+  if (post.format === "html" || post.format === "rich") return post.format;
+  return isFullDocument(post.content) ? "html" : "rich";
+}
+
 export default function PostEditor({ post }) {
   const router = useRouter();
   const { authFetch } = useAuth();
+  const startMode = postMode(post);
+  const formatLocked = !!post; // can only choose the format on a new post
   const [title, setTitle] = useState(post?.title || "");
+  const [subtitle, setSubtitle] = useState(post?.subtitle || "");
+  const [previewText, setPreviewText] = useState(post?.preview_text || "");
+  const [author, setAuthor] = useState(post?.author || "");
   const [tags, setTags] = useState((post?.tags || []).join(", "));
   const [metaDescription, setMetaDescription] = useState(post?.meta_description || "");
   const [ogImage, setOgImage] = useState(post?.og_image || "");
   const [saving, setSaving] = useState(false);
   const [ogImageUploading, setOgImageUploading] = useState(false);
   const [message, setMessage] = useState("");
+  const [mode, setMode] = useState(startMode); // "rich" | "html" — body editor only
+  const [htmlContent, setHtmlContent] = useState(post?.content || "");
   const fileInputRef = useRef(null);
   const ogImageInputRef = useRef(null);
 
   const editor = useEditor({
     extensions: [StarterKit, Image],
-    content: post?.content || "",
+    // Never load an HTML-authored post into Tiptap — it would mangle the markup.
+    content: startMode === "html" ? "" : post?.content || "",
     immediatelyRender: false,
   });
+
+  // Choose the body format on a NEW post. Locked once the post exists, so an
+  // HTML post can never be reopened into rich text (which would convert it).
+  function switchMode(target) {
+    if (formatLocked || target === mode) return;
+    if (target === "html") {
+      if (editor) setHtmlContent(editor.getHTML());
+    } else {
+      editor?.commands.setContent(htmlContent || "");
+    }
+    setMode(target);
+  }
+
+  // Current body content regardless of which editor is active
+  function getContent() {
+    return mode === "html" ? htmlContent : editor?.getHTML() || "";
+  }
 
   function parseTags(input) {
     return input
@@ -46,7 +86,11 @@ export default function PostEditor({ post }) {
 
     const body = {
       title,
-      content: editor.getHTML(),
+      subtitle,
+      preview_text: previewText,
+      author,
+      format: mode,
+      content: getContent(),
       status,
       tags: parseTags(tags),
       meta_description: metaDescription,
@@ -167,67 +211,124 @@ export default function PostEditor({ post }) {
         placeholder="Post title"
         className="title-input"
       />
+      <input
+        type="text"
+        value={subtitle}
+        onChange={(e) => setSubtitle(e.target.value)}
+        placeholder="Subtitle"
+        className="subtitle-input"
+      />
+      <textarea
+        value={previewText}
+        onChange={(e) => setPreviewText(e.target.value)}
+        placeholder="Preview text (shown in the blog list)"
+        className="preview-input"
+        rows={2}
+      />
+      <input
+        type="text"
+        value={author}
+        onChange={(e) => setAuthor(e.target.value)}
+        placeholder="Author"
+        className="author-input"
+      />
 
-      <div className="toolbar">
+      <div className="editor-mode-toggle">
         <button
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          className={editor?.isActive("bold") ? "active" : ""}
+          type="button"
+          onClick={() => switchMode("rich")}
+          disabled={formatLocked}
+          className={mode === "rich" ? "active" : ""}
         >
-          B
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={editor?.isActive("italic") ? "active" : ""}
-        >
-          I
+          Rich Text
         </button>
         <button
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 2 }).run()
-          }
-          className={editor?.isActive("heading", { level: 2 }) ? "active" : ""}
+          type="button"
+          onClick={() => switchMode("html")}
+          disabled={formatLocked}
+          className={mode === "html" ? "active" : ""}
         >
-          H2
+          HTML
         </button>
-        <button
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 3 }).run()
-          }
-          className={editor?.isActive("heading", { level: 3 }) ? "active" : ""}
-        >
-          H3
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={editor?.isActive("bulletList") ? "active" : ""}
-        >
-          List
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          className={editor?.isActive("codeBlock") ? "active" : ""}
-        >
-          Code
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className={editor?.isActive("blockquote") ? "active" : ""}
-        >
-          Quote
-        </button>
-        <button onClick={() => fileInputRef.current?.click()}>
-          Image
-        </button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleImageUpload}
-          accept="image/jpeg,image/png,image/gif,image/webp"
-          style={{ display: "none" }}
-        />
+        {formatLocked && (
+          <span className="mode-locked-note">
+            Format is locked for existing posts
+          </span>
+        )}
       </div>
 
-      <EditorContent editor={editor} className="editor-content" />
+      {mode === "rich" ? (
+        <>
+          <div className="toolbar">
+            <button
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              className={editor?.isActive("bold") ? "active" : ""}
+            >
+              B
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+              className={editor?.isActive("italic") ? "active" : ""}
+            >
+              I
+            </button>
+            <button
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level: 2 }).run()
+              }
+              className={editor?.isActive("heading", { level: 2 }) ? "active" : ""}
+            >
+              H2
+            </button>
+            <button
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level: 3 }).run()
+              }
+              className={editor?.isActive("heading", { level: 3 }) ? "active" : ""}
+            >
+              H3
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
+              className={editor?.isActive("bulletList") ? "active" : ""}
+            >
+              List
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+              className={editor?.isActive("codeBlock") ? "active" : ""}
+            >
+              Code
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleBlockquote().run()}
+              className={editor?.isActive("blockquote") ? "active" : ""}
+            >
+              Quote
+            </button>
+            <button onClick={() => fileInputRef.current?.click()}>
+              Image
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              style={{ display: "none" }}
+            />
+          </div>
+
+          <EditorContent editor={editor} className="editor-content" />
+        </>
+      ) : (
+        <textarea
+          value={htmlContent}
+          onChange={(e) => setHtmlContent(e.target.value)}
+          className="html-editor"
+          spellCheck={false}
+          placeholder="<p>Write raw HTML…</p>"
+        />
+      )}
 
       <div className="editor-meta">
         <label>
@@ -253,7 +354,7 @@ export default function PostEditor({ post }) {
         </label>
 
         <label>
-          OG Image
+          Header Image
           <div>
             <button
               type="button"
