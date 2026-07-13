@@ -204,14 +204,16 @@ postRoutes.get("/:id", async (c) => {
 postRoutes.post("/", auth, async (c) => {
   try {
     const db = c.env.DB;
-    const { title, subtitle, preview_text, author, format, content, status, tags, meta_description, og_image } =
+    const { title, subtitle, preview_text, author, format, content, status, tags, meta_description, og_image, slug: slugInput } =
       await c.req.json();
 
     if (!title || !content) {
       return c.json({ error: "Title and content are required" }, 400);
     }
 
-    const slug = toSlug(title);
+    // Optional custom URL override; falls back to the title-derived slug.
+    const customSlug = slugInput && slugInput.trim() ? toSlug(slugInput) : "";
+    const slug = customSlug || toSlug(title);
 
     const result = await db
       .prepare(
@@ -238,7 +240,7 @@ postRoutes.post("/", auth, async (c) => {
     return c.json(post, 201);
   } catch (err) {
     if (err.message && err.message.includes("UNIQUE")) {
-      return c.json({ error: "A post with this title already exists" }, 409);
+      return c.json({ error: "A post with this title or URL already exists" }, 409);
     }
     console.error("Error creating post:", err);
     return c.json({ error: "Failed to create post" }, 500);
@@ -250,15 +252,24 @@ postRoutes.put("/:id", auth, async (c) => {
   try {
     const db = c.env.DB;
     const id = c.req.param("id");
-    const { title, subtitle, preview_text, author, format, content, status, tags, meta_description, og_image } =
+    const { title, subtitle, preview_text, author, format, content, status, tags, meta_description, og_image, slug: slugInput } =
       await c.req.json();
 
     const fields = [];
     const values = [];
 
+    // A non-empty slug is an explicit custom URL and always wins; otherwise the
+    // slug tracks the title (the default behavior).
+    const customSlug = slugInput && slugInput.trim() ? toSlug(slugInput) : "";
+
     if (title !== undefined) {
       fields.push("title = ?");
       values.push(title);
+    }
+    if (customSlug) {
+      fields.push("slug = ?");
+      values.push(customSlug);
+    } else if (title !== undefined) {
       fields.push("slug = ?");
       values.push(toSlug(title));
     }
@@ -321,6 +332,9 @@ postRoutes.put("/:id", auth, async (c) => {
     const post = parseTags(result);
     return c.json(post);
   } catch (err) {
+    if (err.message && err.message.includes("UNIQUE")) {
+      return c.json({ error: "A post with this title or URL already exists" }, 409);
+    }
     console.error("Error updating post:", err);
     return c.json({ error: "Failed to update post" }, 500);
   }

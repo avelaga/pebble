@@ -15,6 +15,15 @@ function isFullDocument(html) {
   return /<!doctype\s+html|<html[\s>]/i.test(html || "");
 }
 
+// Mirrors the API's slug derivation so the editor can preview the auto-generated
+// URL and detect whether a stored slug is a custom override.
+function toSlug(text) {
+  return (text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 // The editing mode a post was authored in. Once set it never changes —
 // converting HTML <-> rich text mangles content, so the toggle is locked
 // for existing posts.
@@ -33,6 +42,12 @@ export default function PostEditor({ post }) {
   const [subtitle, setSubtitle] = useState(post?.subtitle || "");
   const [previewText, setPreviewText] = useState(post?.preview_text || "");
   const [author, setAuthor] = useState(post?.author || "");
+  // Custom URL override. Empty means "derive from the title" (the default). For
+  // an existing post we only prefill it when the stored slug isn't the plain
+  // title-derived one — i.e. it was genuinely a custom URL.
+  const [slug, setSlug] = useState(
+    post?.slug && post.slug !== toSlug(post.title) ? post.slug : ""
+  );
   const [tags, setTags] = useState((post?.tags || []).join(", "));
   const [metaDescription, setMetaDescription] = useState(post?.meta_description || "");
   const [ogImage, setOgImage] = useState(post?.og_image || "");
@@ -89,6 +104,7 @@ export default function PostEditor({ post }) {
       subtitle,
       preview_text: previewText,
       author,
+      slug: slug.trim(),
       format: mode,
       content: getContent(),
       status,
@@ -232,6 +248,21 @@ export default function PostEditor({ post }) {
         placeholder="Author"
         className="author-input"
       />
+      <div className="slug-field">
+        <div className="slug-input-wrap">
+          <span className="slug-prefix">/</span>
+          <input
+            type="text"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+            placeholder="custom-url (optional — defaults to the title)"
+            className="slug-input"
+          />
+        </div>
+        <span className="field-hint">
+          URL slug: /{toSlug(slug) || toSlug(title) || "…"}
+        </span>
+      </div>
 
       <div className="editor-mode-toggle">
         <button

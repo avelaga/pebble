@@ -509,3 +509,40 @@ button:disabled {
   min-height: 60px;
   resize: vertical;
 }
+.field-hint {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+  opacity: 0.8;
+  word-break: break-all;
+}
+.slug-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+.slug-input-wrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding-left: 0.75rem;
+}
+.slug-input-wrap:focus-within {
+  border-color: var(--accent);
+}
+.slug-prefix {
+  color: var(--muted);
+  font-size: 0.95rem;
+  user-select: none;
+}
+.slug-input {
+  flex: 1;
+  padding: 0.6rem 0.75rem 0.6rem 0.15rem;
+  font-size: 0.95rem;
+  border: none;
+  background: none;
+  outline: none;
+  color: inherit;
+}

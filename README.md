@@ -13,6 +13,7 @@ Most headless CMS platforms require a live server (Ghost, Strapi, Payload all ne
 - **Draft / publish workflow** - public reads return only published posts; authenticated reads include drafts
 - **Rich text or raw HTML** - write posts in a Tiptap rich-text editor or hand-author raw HTML; the format is chosen per post and locked once created so content is never mangled by a conversion
 - **Post metadata** - subtitle, author, and custom preview-text fields alongside title, body, and tags
+- **Custom URLs** - optional per-post slug override; leave it blank and the URL is derived from the title
 - **Auto-deploy on publish** - optional deploy hook triggers a frontend rebuild whenever you publish a post, making it a first-class citizen in any SSG workflow (Next.js, Astro, SvelteKit, etc.)
 - **Image uploads** - stored in R2, served from a public URL, no egress fees
 - **SEO fields** - title, description, and OG fields baked in
@@ -70,7 +71,8 @@ Auth is optional on `GET /api/posts` - unauthenticated requests return only publ
 
 | Field | Description |
 |---|---|
-| `title` | Post title (required); the slug is derived from it |
+| `title` | Post title (required); the slug is derived from it unless a custom `slug` is given |
+| `slug` | Optional custom URL. When set, overrides the title-derived slug; when blank, the slug tracks the title. Normalized to a URL-safe form and must be unique |
 | `content` | Post body — rich-text HTML or a raw HTML document, depending on `format` |
 | `format` | `rich` (Tiptap rich text) or `html` (raw HTML). Defaults to `rich`; set on create and not meant to change afterward |
 | `subtitle` | Optional subtitle |
@@ -136,7 +138,7 @@ cd api && npm run reset-password
 
 Next.js editor UI deployed to [Cloudflare Workers](https://workers.cloudflare.com/) via [OpenNext](https://opennext.js.org/cloudflare). Uses Tiptap for rich text editing, JWT for auth.
 
-**Features:** create/edit/delete posts, publish or draft, rich-text or raw-HTML authoring, subtitle / author / preview-text fields, tags, SEO fields, image upload.
+**Features:** create/edit/delete posts, publish or draft, rich-text or raw-HTML authoring, subtitle / author / preview-text fields, custom URL override, tags, SEO fields, image upload.
 
 ### Environment
 
