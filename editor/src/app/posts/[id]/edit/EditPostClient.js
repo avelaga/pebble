@@ -4,17 +4,20 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import PostEditor from "../../../components/PostEditor";
+import { useAuth } from "../../../components/AuthProvider";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export default function EditPostClient() {
   const { id } = useParams();
+  const { authFetch } = useAuth();
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/posts/${id}`)
+    // Drafts and private posts are only returned to a signed-in editor.
+    authFetch(`${API_URL}/api/posts/${id}`)
       .then((res) => {
         if (!res.ok) throw new Error("Post not found");
         return res.json();

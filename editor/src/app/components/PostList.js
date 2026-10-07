@@ -88,6 +88,9 @@ export default function PostList() {
                 <span className={`status-badge ${post.status}`}>
                   {post.status}
                 </span>
+                {post.private && (
+                  <span className="status-badge private">private</span>
+                )}
               </td>
               <td>
                 <div className="tag-list">

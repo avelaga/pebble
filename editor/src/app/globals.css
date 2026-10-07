@@ -132,6 +132,11 @@ button:disabled {
   background: #e6f4ea;
   color: var(--success);
 }
+.status-badge.private {
+  margin-left: 0.3rem;
+  background: #fdf1dc;
+  color: #8a5a00;
+}
 
 /* Post editor */
 .post-editor {
@@ -545,4 +550,25 @@ button:disabled {
   background: none;
   outline: none;
   color: inherit;
+}
+
+.private-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+.private-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.private-slug-btn {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
 }

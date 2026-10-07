@@ -51,6 +51,7 @@ export default function PostEditor({ post }) {
   const [tags, setTags] = useState((post?.tags || []).join(", "));
   const [metaDescription, setMetaDescription] = useState(post?.meta_description || "");
   const [ogImage, setOgImage] = useState(post?.og_image || "");
+  const [isPrivate, setIsPrivate] = useState(!!post?.private);
   const [saving, setSaving] = useState(false);
   const [ogImageUploading, setOgImageUploading] = useState(false);
   const [message, setMessage] = useState("");
@@ -71,7 +72,9 @@ export default function PostEditor({ post }) {
   function switchMode(target) {
     if (formatLocked || target === mode) return;
     if (target === "html") {
-      if (editor) setHtmlContent(editor.getHTML());
+      // An empty Tiptap editor still reports "<p></p>"; carrying that over would
+      // wrap whatever gets pasted into the textarea in a stray paragraph.
+      if (editor) setHtmlContent(editor.isEmpty ? "" : editor.getHTML());
     } else {
       editor?.commands.setContent(htmlContent || "");
     }
@@ -111,6 +114,7 @@ export default function PostEditor({ post }) {
       tags: parseTags(tags),
       meta_description: metaDescription,
       og_image: ogImage,
+      private: isPrivate,
     };
 
     try {
@@ -142,6 +146,14 @@ export default function PostEditor({ post }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  // A private post is only as private as its URL, so it gets a random suffix
+  // nobody can guess from the title.
+  function generatePrivateSlug() {
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
+    const suffix = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    setSlug(`${toSlug(slug) || toSlug(title) || "post"}-${suffix}`);
   }
 
   async function handleImageUpload(e) {
@@ -262,6 +274,28 @@ export default function PostEditor({ post }) {
         <span className="field-hint">
           URL slug: /{toSlug(slug) || toSlug(title) || "…"}
         </span>
+      </div>
+
+      <div className="private-field">
+        <label className="private-toggle">
+          <input
+            type="checkbox"
+            checked={isPrivate}
+            onChange={(e) => setIsPrivate(e.target.checked)}
+          />
+          Private (unlisted)
+        </label>
+        {isPrivate && (
+          <>
+            <span className="field-hint">
+              Reachable only by direct link. Left out of the post list, tags and
+              sitemap, and marked noindex. Anyone with the link can still open it.
+            </span>
+            <button type="button" onClick={generatePrivateSlug} className="private-slug-btn">
+              Generate unguessable URL
+            </button>
+          </>
+        )}
       </div>
 
       <div className="editor-mode-toggle">

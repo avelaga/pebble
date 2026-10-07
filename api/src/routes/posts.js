@@ -4,19 +4,26 @@ import { toSlug } from "../utils/slug";
 
 export const postRoutes = new Hono();
 
-// Parse tags JSON string from DB into array
-function parseTags(post) {
+// Parse tags JSON string from DB into array, and the private flag into a boolean
+function parsePost(post) {
   if (!post) return post;
   try {
     post.tags = JSON.parse(post.tags || "[]");
   } catch {
     post.tags = [];
   }
+  post.private = !!post.private;
   return post;
 }
 
-function parseTagsList(posts) {
-  return posts.map(parseTags);
+function parsePostList(posts) {
+  return posts.map(parsePost);
+}
+
+// Private posts are published but unlisted: only the editor and the site build
+// may see them in listings or fetch them.
+function canSeePrivate(c) {
+  return !!(c.get("user") || c.get("build"));
 }
 
 function contentPreview(html) {
@@ -44,7 +51,7 @@ async function touchContent(db) {
 postRoutes.get("/", optionalAuth, async (c) => {
   try {
     const db = c.env.DB;
-    const { status, tag, page = "1", limit = "20" } = c.req.query();
+    const { status, tag, include_private, page = "1", limit = "20" } = c.req.query();
     const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
     const safeLimit = Math.min(100, Math.max(1, parseInt(limit)));
 
@@ -62,6 +69,9 @@ postRoutes.get("/", optionalAuth, async (c) => {
     } else {
       where.push("status = ?");
       params.push("published");
+      if (!(include_private === "1" && canSeePrivate(c))) {
+        where.push("private = 0");
+      }
     }
 
     if (tag) {
@@ -80,7 +90,7 @@ postRoutes.get("/", optionalAuth, async (c) => {
 
     const rows = await db
       .prepare(
-        `SELECT id, title, subtitle, preview_text, author, format, slug, status, tags, meta_description, og_image, content, created_at, updated_at
+        `SELECT id, title, subtitle, preview_text, author, format, slug, status, tags, meta_description, og_image, private, content, created_at, updated_at
          FROM posts ${whereClause}
          ORDER BY created_at DESC
          LIMIT ? OFFSET ?`
@@ -88,7 +98,7 @@ postRoutes.get("/", optionalAuth, async (c) => {
       .bind(...params, safeLimit, offset)
       .all();
 
-    const posts = parseTagsList(rows.results).map((p) => {
+    const posts = parsePostList(rows.results).map((p) => {
       const preview = contentPreview(p.content);
       delete p.content;
       return { ...p, content_preview: preview };
@@ -109,8 +119,9 @@ postRoutes.get("/", optionalAuth, async (c) => {
   }
 });
 
-// GET /api/posts/by-slug/:slug - get post by slug (public, published only)
-postRoutes.get("/by-slug/:slug", async (c) => {
+// GET /api/posts/by-slug/:slug - get post by slug (public, published only;
+// private posts need editor or build auth)
+postRoutes.get("/by-slug/:slug", optionalAuth, async (c) => {
   try {
     const db = c.env.DB;
     const slug = c.req.param("slug");
@@ -119,10 +130,10 @@ postRoutes.get("/by-slug/:slug", async (c) => {
       .bind(slug)
       .first();
 
-    if (!row) {
+    if (!row || (row.private && !canSeePrivate(c))) {
       return c.json({ error: "Post not found" }, 404);
     }
-    return c.json(parseTags(row));
+    return c.json(parsePost(row));
   } catch (err) {
     console.error("Error fetching post:", err);
     return c.json({ error: "Failed to fetch post" }, 500);
@@ -142,7 +153,7 @@ postRoutes.get("/by-tag/:tag", async (c) => {
 
     const countResult = await db
       .prepare(
-        "SELECT COUNT(*) as count FROM posts WHERE status = 'published' AND tags LIKE ?"
+        "SELECT COUNT(*) as count FROM posts WHERE status = 'published' AND private = 0 AND tags LIKE ?"
       )
       .bind(tagPattern)
       .first();
@@ -150,15 +161,15 @@ postRoutes.get("/by-tag/:tag", async (c) => {
 
     const rows = await db
       .prepare(
-        `SELECT id, title, subtitle, preview_text, author, format, slug, status, tags, meta_description, og_image, content, created_at, updated_at
-         FROM posts WHERE status = 'published' AND tags LIKE ?
+        `SELECT id, title, subtitle, preview_text, author, format, slug, status, tags, meta_description, og_image, private, content, created_at, updated_at
+         FROM posts WHERE status = 'published' AND private = 0 AND tags LIKE ?
          ORDER BY created_at DESC
          LIMIT ? OFFSET ?`
       )
       .bind(tagPattern, safeLimit, offset)
       .all();
 
-    const posts = parseTagsList(rows.results).map((p) => {
+    const posts = parsePostList(rows.results).map((p) => {
       const preview = contentPreview(p.content);
       delete p.content;
       return { ...p, content_preview: preview };
@@ -180,8 +191,9 @@ postRoutes.get("/by-tag/:tag", async (c) => {
   }
 });
 
-// GET /api/posts/:id - get single post by ID
-postRoutes.get("/:id", async (c) => {
+// GET /api/posts/:id - get single post by ID. IDs are sequential, so drafts and
+// private posts are only returned to the editor.
+postRoutes.get("/:id", optionalAuth, async (c) => {
   try {
     const db = c.env.DB;
     const id = c.req.param("id");
@@ -190,10 +202,10 @@ postRoutes.get("/:id", async (c) => {
       .bind(id)
       .first();
 
-    if (!row) {
+    if (!row || ((row.status !== "published" || row.private) && !c.get("user"))) {
       return c.json({ error: "Post not found" }, 404);
     }
-    return c.json(parseTags(row));
+    return c.json(parsePost(row));
   } catch (err) {
     console.error("Error fetching post:", err);
     return c.json({ error: "Failed to fetch post" }, 500);
@@ -204,7 +216,7 @@ postRoutes.get("/:id", async (c) => {
 postRoutes.post("/", auth, async (c) => {
   try {
     const db = c.env.DB;
-    const { title, subtitle, preview_text, author, format, content, status, tags, meta_description, og_image, slug: slugInput } =
+    const { title, subtitle, preview_text, author, format, content, status, tags, meta_description, og_image, private: isPrivate, slug: slugInput } =
       await c.req.json();
 
     if (!title || !content) {
@@ -217,8 +229,8 @@ postRoutes.post("/", auth, async (c) => {
 
     const result = await db
       .prepare(
-        `INSERT INTO posts (title, subtitle, preview_text, author, format, content, slug, status, tags, meta_description, og_image)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
+        `INSERT INTO posts (title, subtitle, preview_text, author, format, content, slug, status, tags, meta_description, og_image, private)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
       )
       .bind(
         title,
@@ -231,12 +243,13 @@ postRoutes.post("/", auth, async (c) => {
         status || "draft",
         JSON.stringify(tags || []),
         meta_description || "",
-        og_image || ""
+        og_image || "",
+        isPrivate ? 1 : 0
       )
       .first();
 
     await touchContent(db);
-    const post = parseTags(result);
+    const post = parsePost(result);
     return c.json(post, 201);
   } catch (err) {
     if (err.message && err.message.includes("UNIQUE")) {
@@ -252,7 +265,7 @@ postRoutes.put("/:id", auth, async (c) => {
   try {
     const db = c.env.DB;
     const id = c.req.param("id");
-    const { title, subtitle, preview_text, author, format, content, status, tags, meta_description, og_image, slug: slugInput } =
+    const { title, subtitle, preview_text, author, format, content, status, tags, meta_description, og_image, private: isPrivate, slug: slugInput } =
       await c.req.json();
 
     const fields = [];
@@ -309,6 +322,10 @@ postRoutes.put("/:id", auth, async (c) => {
       fields.push("og_image = ?");
       values.push(og_image);
     }
+    if (isPrivate !== undefined) {
+      fields.push("private = ?");
+      values.push(isPrivate ? 1 : 0);
+    }
 
     if (fields.length === 0) {
       return c.json({ error: "No fields to update" }, 400);
@@ -329,7 +346,7 @@ postRoutes.put("/:id", auth, async (c) => {
     }
 
     await touchContent(db);
-    const post = parseTags(result);
+    const post = parsePost(result);
     return c.json(post);
   } catch (err) {
     if (err.message && err.message.includes("UNIQUE")) {
