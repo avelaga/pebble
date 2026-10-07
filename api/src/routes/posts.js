@@ -20,11 +20,6 @@ function parsePostList(posts) {
   return posts.map(parsePost);
 }
 
-// Private posts are published but unlisted: only the editor and the site build
-// may see them in listings or fetch them.
-function canSeePrivate(c) {
-  return !!(c.get("user") || c.get("build"));
-}
 
 function contentPreview(html) {
   const text = html
@@ -51,7 +46,7 @@ async function touchContent(db) {
 postRoutes.get("/", optionalAuth, async (c) => {
   try {
     const db = c.env.DB;
-    const { status, tag, include_private, page = "1", limit = "20" } = c.req.query();
+    const { status, tag, page = "1", limit = "20" } = c.req.query();
     const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
     const safeLimit = Math.min(100, Math.max(1, parseInt(limit)));
 
@@ -69,9 +64,6 @@ postRoutes.get("/", optionalAuth, async (c) => {
     } else {
       where.push("status = ?");
       params.push("published");
-      if (!(include_private === "1" && canSeePrivate(c))) {
-        where.push("private = 0");
-      }
     }
 
     if (tag) {
@@ -119,9 +111,8 @@ postRoutes.get("/", optionalAuth, async (c) => {
   }
 });
 
-// GET /api/posts/by-slug/:slug - get post by slug (public, published only;
-// private posts need editor or build auth)
-postRoutes.get("/by-slug/:slug", optionalAuth, async (c) => {
+// GET /api/posts/by-slug/:slug - get post by slug (public, published only)
+postRoutes.get("/by-slug/:slug", async (c) => {
   try {
     const db = c.env.DB;
     const slug = c.req.param("slug");
@@ -130,7 +121,7 @@ postRoutes.get("/by-slug/:slug", optionalAuth, async (c) => {
       .bind(slug)
       .first();
 
-    if (!row || (row.private && !canSeePrivate(c))) {
+    if (!row) {
       return c.json({ error: "Post not found" }, 404);
     }
     return c.json(parsePost(row));
@@ -153,7 +144,7 @@ postRoutes.get("/by-tag/:tag", async (c) => {
 
     const countResult = await db
       .prepare(
-        "SELECT COUNT(*) as count FROM posts WHERE status = 'published' AND private = 0 AND tags LIKE ?"
+        "SELECT COUNT(*) as count FROM posts WHERE status = 'published' AND tags LIKE ?"
       )
       .bind(tagPattern)
       .first();
@@ -162,7 +153,7 @@ postRoutes.get("/by-tag/:tag", async (c) => {
     const rows = await db
       .prepare(
         `SELECT id, title, subtitle, preview_text, author, format, slug, status, tags, meta_description, og_image, private, content, created_at, updated_at
-         FROM posts WHERE status = 'published' AND private = 0 AND tags LIKE ?
+         FROM posts WHERE status = 'published' AND tags LIKE ?
          ORDER BY created_at DESC
          LIMIT ? OFFSET ?`
       )
@@ -191,8 +182,8 @@ postRoutes.get("/by-tag/:tag", async (c) => {
   }
 });
 
-// GET /api/posts/:id - get single post by ID. IDs are sequential, so drafts and
-// private posts are only returned to the editor.
+// GET /api/posts/:id - get single post by ID. IDs are sequential, so drafts are
+// only returned to the editor.
 postRoutes.get("/:id", optionalAuth, async (c) => {
   try {
     const db = c.env.DB;
@@ -202,7 +193,7 @@ postRoutes.get("/:id", optionalAuth, async (c) => {
       .bind(id)
       .first();
 
-    if (!row || ((row.status !== "published" || row.private) && !c.get("user"))) {
+    if (!row || (row.status !== "published" && !c.get("user"))) {
       return c.json({ error: "Post not found" }, 404);
     }
     return c.json(parsePost(row));

@@ -288,8 +288,8 @@ export default function PostEditor({ post }) {
         {isPrivate && (
           <>
             <span className="field-hint">
-              Reachable only by direct link. Left out of the post list, tags and
-              sitemap, and marked noindex. Anyone with the link can still open it.
+              Reachable by direct link only. Left out of the post list and
+              sitemap, and marked noindex. Anyone with the link can open it.
             </span>
             <button type="button" onClick={generatePrivateSlug} className="private-slug-btn">
               Generate unguessable URL

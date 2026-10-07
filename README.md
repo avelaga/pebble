@@ -82,7 +82,7 @@ Auth is optional on `GET /api/posts` - unauthenticated requests return only publ
 | `tags` | Array of tag strings |
 | `meta_description` | SEO meta description |
 | `og_image` | Header / Open Graph image URL |
-| `private` | Unlisted post: published and reachable by its URL, but left out of public listings, tag lists, and the sitemap, and served with `noindex`. Listing or fetching it requires editor or build auth (`BUILD_TOKEN`) |
+| `private` | Unlisted post: published and reachable by its URL like any other. The API returns it as usual; the frontend is expected to leave it out of listings and the sitemap and mark it `noindex` |
 
 > **Note:** post content is stored as-authored and is **not** sanitized server-side. Since Pebble is single-editor, the raw-HTML mode intentionally trusts the author. If you expose the editor more widely, sanitize on render.
 
@@ -115,7 +115,6 @@ api/
 | `EDITOR_USERNAME` | Editor login username |
 | `EDITOR_PASSWORD_HASH` | bcrypt hash of editor password |
 | `DEPLOY_HOOK` | Deploy hook URL to trigger frontend rebuilds (optional) |
-| `BUILD_TOKEN` | Shared secret the frontend build sends as `Authorization: Bearer …` to list and fetch private posts (optional; without it private posts are never served) |
 
 > **Upgrading an existing database:** add the `private` column with `npx wrangler d1 execute <your-db-name> --remote --file=migrations/0001_add_private.sql`.
 
