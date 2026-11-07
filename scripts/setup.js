@@ -171,7 +171,7 @@ async function main() {
   const workerName = (await prompt(`  Cloudflare Worker        [${defaultWorkerName}]: `)) || defaultWorkerName;
   const dbName = (await prompt(`  D1 database              [${defaultDbName}]: `)) || defaultDbName;
   const bucketName = (await prompt(`  R2 bucket                [${defaultBucketName}]: `)) || defaultBucketName;
-  const editorName = (await prompt(`  Cloudflare Pages project [${defaultEditorName}]: `)) || defaultEditorName;
+  const editorName = (await prompt(`  Editor Worker            [${defaultEditorName}]: `)) || defaultEditorName;
 
   validateResourceName(workerName);
   validateResourceName(dbName);
@@ -378,9 +378,10 @@ async function main() {
   if (workerUrl) console.log(`Worker:  ${workerUrl}`);
   if (prodEditorUrl) console.log(`Editor:  ${prodEditorUrl}`);
 
-  console.log("\nOptional: trigger a frontend rebuild when a post is published.");
+  console.log("\nOptional: enable the editor's \"Rebuild site\" button.");
   console.log("Create a deploy hook in your Cloudflare Pages, Vercel, or Netlify project, then:");
   console.log("  cd api && npx wrangler secret put DEPLOY_HOOK");
+  console.log("For build status in the editor (Vercel only), also set VERCEL_TOKEN and VERCEL_PROJECT_ID.");
 
   rl.close();
 }

@@ -1,7 +1,10 @@
 JWT_SECRET=your-jwt-secret-here
 EDITOR_USERNAME=your-editor-username
 EDITOR_PASSWORD_HASH=your-bcrypt-password-hash
+# Optional: powers the editor's "Rebuild site" button
 DEPLOY_HOOK=your-deploy-hook-url
+# Optional: build status + "Changes not deployed" indicator (Vercel only)
 VERCEL_TOKEN=your-vercel-access-token
+VERCEL_PROJECT_ID=your-vercel-project-id
 # Optional, only if the project lives under a Vercel team:
 # VERCEL_TEAM_ID=your-vercel-team-id

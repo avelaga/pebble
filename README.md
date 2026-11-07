@@ -5,18 +5,19 @@ A minimalist self-hosted headless blog CMS. Runs entirely on free tiers - no ser
 <img src="https://i.imgur.com/rq5lrhG.png"/>
 <img src="https://i.imgur.com/eUlTOXo.png"/>
 
-Most headless CMS platforms require a live server (Ghost, Strapi, Payload all need a VPS at ~$6–12/month minimum). Pebble runs entirely on Cloudflare - Workers, D1, R2, and Pages - meaning it deploys globally, scales automatically, and costs nothing on free tiers. A single setup script handles everything end-to-end.
+Most headless CMS platforms require a live server (Ghost, Strapi, Payload all need a VPS at ~$6–12/month minimum). Pebble runs entirely on Cloudflare - Workers, D1, and R2 - meaning it deploys globally, scales automatically, and costs nothing on free tiers. A single setup script handles everything end-to-end.
 
 ## Features
 
 - **REST API** - clean endpoints for posts, slugs, tags, and image uploads
 - **Draft / publish workflow** - public reads return only published posts; authenticated reads include drafts
-- **Rich text or raw HTML** - write posts in a Tiptap rich-text editor or hand-author raw HTML; the format is chosen per post and locked once created so content is never mangled by a conversion
+- **Rich text or raw HTML** - write everyday posts in a Tiptap rich-text editor, or paste in raw HTML for interactive content - calculators, charts, embedded tools - including HTML generated with an AI coding assistant. The format is chosen per post and locked once created so content is never mangled by a conversion
 - **Post metadata** - subtitle, author, and custom preview-text fields alongside title, body, and tags
 - **Custom URLs** - optional per-post slug override; leave it blank and the URL is derived from the title
-- **Auto-deploy on publish** - optional deploy hook triggers a frontend rebuild whenever you publish a post, making it a first-class citizen in any SSG workflow (Next.js, Astro, SvelteKit, etc.)
+- **Private (unlisted) posts** - published and reachable by direct link, with a one-click unguessable URL; your frontend leaves them out of listings
+- **One-click site rebuild** - make as many edits as you like, then hit **Rebuild site** once to trigger your frontend's deploy hook. Works with any SSG (Next.js, Astro, SvelteKit, etc.); on Vercel the editor also shows live build status and flags undeployed changes
 - **Image uploads** - stored in R2, served from a public URL, no egress fees
-- **SEO fields** - title, description, and OG fields baked in
+- **SEO fields** - meta description and header / Open Graph image
 - **Tags** - lightweight taxonomy, no configuration needed
 - **JWT auth** - 7-day tokens, bcrypt-hashed credentials stored as Cloudflare secrets
 - **Multi-instance support** - namespace all resources with `--prefix` to run multiple sites on one account
@@ -56,23 +57,25 @@ Cloudflare Worker built with [Hono](https://hono.dev/). Uses D1 (SQLite) for pos
 |---|---|---|---|
 | POST | `/api/auth/login` | - | Returns JWT (7-day expiry) |
 | GET | `/api/posts` | Optional | List posts. Params: `status`, `tag`, `page`, `limit` |
-| GET | `/api/posts/:id` | - | Get post by ID |
+| GET | `/api/posts/:id` | Optional | Get post by ID (drafts require auth) |
 | GET | `/api/posts/by-slug/:slug` | - | Get post by slug |
 | GET | `/api/posts/by-tag/:tag` | - | List posts by tag |
 | POST | `/api/posts` | Required | Create post |
 | PUT | `/api/posts/:id` | Required | Update post |
 | DELETE | `/api/posts/:id` | Required | Delete post |
 | POST | `/api/uploads` | Required | Upload image (JPEG/PNG/GIF/WebP, max 5MB) |
+| POST | `/api/deploy/rebuild` | Required | Trigger the `DEPLOY_HOOK` to rebuild your frontend |
+| GET | `/api/deploy/status` | Required | Latest build state and whether content changed since (Vercel only) |
 | GET | `/health` | - | Health check |
 
-Auth is optional on `GET /api/posts` - unauthenticated requests return only published posts, authenticated requests include drafts.
+`GET /api/posts` returns published posts by default. `status=draft` or `status=all` require auth. `limit` defaults to 20 (max 100). List responses include a `content_preview` instead of the full `content`, plus a `pagination` object. Creating or updating a post whose title or slug is already taken returns `409`.
 
 ### Post fields
 
 | Field | Description |
 |---|---|
-| `title` | Post title (required); the slug is derived from it unless a custom `slug` is given |
-| `slug` | Optional custom URL. When set, overrides the title-derived slug; when blank, the slug tracks the title. Normalized to a URL-safe form and must be unique |
+| `title` | Post title (required, must be unique); the slug is derived from it unless a custom `slug` is given |
+| `slug` | Optional custom URL. When set, overrides the title-derived slug; when blank, the slug tracks the title - so renaming a post without a custom slug changes its URL. Normalized to a URL-safe form and must be unique |
 | `content` | Post body — rich-text HTML or a raw HTML document, depending on `format` |
 | `format` | `rich` (Tiptap rich text) or `html` (raw HTML). Defaults to `rich`; set on create and not meant to change afterward |
 | `subtitle` | Optional subtitle |
@@ -84,13 +87,14 @@ Auth is optional on `GET /api/posts` - unauthenticated requests return only publ
 | `og_image` | Header / Open Graph image URL |
 | `private` | Unlisted post: published and reachable by its URL like any other. The API returns it as usual; the frontend is expected to leave it out of listings and the sitemap and mark it `noindex` |
 
-> **Note:** post content is stored as-authored and is **not** sanitized server-side. Since Pebble is single-editor, the raw-HTML mode intentionally trusts the author. If you expose the editor more widely, sanitize on render.
+> **Note:** post content is stored as-authored and is **not** sanitized server-side. Since Pebble is single-editor, the raw-HTML mode intentionally trusts the author. Render `html` posts as-is (or inside a sandboxed iframe) - running them through a sanitizer will strip the scripts that make interactive posts work. If you expose the editor more widely, revisit this trade-off.
 
 ### Project structure
 ```
 api/
 ├── wrangler.toml              # Cloudflare config, bindings, vars
-├── schema.sql                 # D1 database schema
+├── schema.sql                 # D1 database schema (fresh installs)
+├── migrations/                # Schema upgrades for existing databases
 ├── scripts/
 │   └── reset-password.js      # Interactive password reset
 └── src/
@@ -98,7 +102,8 @@ api/
     ├── routes/
     │   ├── auth.js            # POST /api/auth/login
     │   ├── posts.js           # CRUD for posts
-    │   └── uploads.js         # Image upload to R2
+    │   ├── uploads.js         # Image upload to R2
+    │   └── deploy.js          # Rebuild trigger + build status
     ├── middleware/
     │   └── auth.js            # JWT verification
     └── utils/
@@ -114,9 +119,18 @@ api/
 | `JWT_SECRET` | Random string for signing JWTs |
 | `EDITOR_USERNAME` | Editor login username |
 | `EDITOR_PASSWORD_HASH` | bcrypt hash of editor password |
-| `DEPLOY_HOOK` | Deploy hook URL to trigger frontend rebuilds (optional) |
+| `DEPLOY_HOOK` | Deploy hook URL; enables the editor's **Rebuild site** button (optional) |
+| `VERCEL_TOKEN` | Vercel access token; enables build status in the editor (optional, Vercel only) |
+| `VERCEL_PROJECT_ID` | Vercel project ID for build status (required with `VERCEL_TOKEN`) |
+| `VERCEL_TEAM_ID` | Only if the Vercel project belongs to a team (optional) |
 
-> **Upgrading an existing database:** add the `private` column with `npx wrangler d1 execute <your-db-name> --remote --file=migrations/0001_add_private.sql`.
+> **Upgrading an existing database:** `schema.sql` is for fresh installs. For an existing database, apply the files in `api/migrations/` that you're missing, in order, with `npx wrangler d1 execute <your-db-name> --remote --file=migrations/<file>.sql`. Check which columns you already have with `npx wrangler d1 execute <your-db-name> --remote --command "PRAGMA table_info(posts)"`.
+>
+> | Migration | Adds |
+> |---|---|
+> | `0001_add_meta_table.sql` | `meta` table used for "Changes not deployed" tracking (safe to re-run) |
+> | `0002_add_post_metadata.sql` | `subtitle`, `preview_text`, `author`, `format` |
+> | `0003_add_private.sql` | `private` |
 
 **Vars** (`wrangler.toml`):
 
@@ -141,7 +155,7 @@ cd api && npm run reset-password
 
 Next.js editor UI deployed to [Cloudflare Workers](https://workers.cloudflare.com/) via [OpenNext](https://opennext.js.org/cloudflare). Uses Tiptap for rich text editing, JWT for auth.
 
-**Features:** create/edit/delete posts, publish or draft, rich-text or raw-HTML authoring, subtitle / author / preview-text fields, custom URL override, tags, SEO fields, image upload.
+**Features:** create/edit/delete posts, publish or draft (also toggleable from the post list), rich-text or raw-HTML authoring, subtitle / author / preview-text fields, custom URL override, private posts with unguessable URLs, tags, SEO fields, image and header-image upload, and a **Rebuild site** button with build status.
 
 ### Environment
 
@@ -163,30 +177,34 @@ npx wrangler deploy
 ### API
 ```bash
 cd api
+npm install
 cp wrangler.toml.example wrangler.toml
-cp .dev.vars.example .dev.vars
+cp .dev.vars.example .dev.vars   # fill in; generate a hash with: node -e "console.log(require('bcryptjs').hashSync('yourpassword', 10))"
 npx wrangler d1 execute <your-db-name> --local --file=schema.sql
-npx wrangler dev
+npx wrangler dev                 # serves on http://localhost:8787
 ```
 
 ### Editor
 ```bash
 cd editor
-cp .env.local.example .env.local
-npm run dev
+npm install
+cp .env.local.example .env.local   # points at http://localhost:8787
+npm run dev                        # serves on http://localhost:3000
 ```
 
 Make sure `http://localhost:3000` is in `CORS_ORIGINS` in `wrangler.toml`.
 
 ---
 
-## Deploy hook
+## Rebuilding your site
 
-Set `DEPLOY_HOOK` as a Worker secret to trigger a rebuild of your frontend whenever a post is published. Works with any platform that supports deploy hooks - Cloudflare Pages, Vercel, Netlify, etc.
+Pebble doesn't rebuild your frontend on every save. Editing several posts in a row would otherwise queue a pointless build for each one. Instead, make all your changes, then click **Rebuild site** in the editor once. It calls your `DEPLOY_HOOK`, which works with any platform that supports deploy hooks - Cloudflare Pages, Vercel, Netlify, etc.
 
 ```bash
 cd api && npx wrangler secret put DEPLOY_HOOK
 ```
+
+If your frontend is on **Vercel**, also set `VERCEL_TOKEN` and `VERCEL_PROJECT_ID` (and `VERCEL_TEAM_ID` for team projects). The editor will then show the live build state and a **Changes not deployed** indicator whenever posts have changed since the last build. On other platforms the Rebuild button still works, but no status is shown.
 
 ---
 
@@ -194,6 +212,6 @@ cd api && npx wrangler secret put DEPLOY_HOOK
 
 Pebble is intentionally single-editor. If you need multi-author support, fork it.
 
-JWT tokens are stored in localStorage. This is a deliberate trade-off: httpOnly cookies don't work cleanly cross-origin between Cloudflare Pages and Workers, and for a personal CMS the attack surface is minimal.
+JWT tokens are stored in localStorage. This is a deliberate trade-off: httpOnly cookies don't work cleanly cross-origin between the editor and API Workers, and for a personal CMS the attack surface is minimal.
 
 Pebble runs on Cloudflare free tiers, which are subject to change. Current limits are well above what any blog will realistically hit.
