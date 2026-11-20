@@ -3,6 +3,8 @@
 import Link from "next/link";
 import PostList from "./components/PostList";
 import RebuildButton from "./components/RebuildButton";
+import ThemeToggle from "./components/ThemeToggle";
+import Logo from "./components/Logo";
 import { useAuth } from "./components/AuthProvider";
 
 export default function Home() {
@@ -11,13 +13,14 @@ export default function Home() {
   return (
     <main className="container">
       <div className="header">
-        <h1>Pebble Editor</h1>
+        <Logo />
         <div className="header-actions">
           <RebuildButton />
           <Link href="/posts/new" className="new-post-btn">
             + New Post
           </Link>
-          <button onClick={logout} className="logout-btn">
+          <ThemeToggle />
+          <button onClick={logout} className="text-btn">
             Log out
           </button>
         </div>

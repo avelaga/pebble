@@ -2,8 +2,8 @@
 
 A minimalist self-hosted headless blog CMS. Runs entirely on free tiers - no server, no monthly bill.
 
-<img src="https://i.imgur.com/rq5lrhG.png"/>
-<img src="https://i.imgur.com/eUlTOXo.png"/>
+<img src="docs/screenshots/post-list.png" alt="Pebble's post list, with status tags, topic tags and actions for each post"/>
+<img src="docs/screenshots/editor.png" alt="Pebble's post editor, with the rich text toolbar"/>
 
 Most headless CMS platforms require a live server (Ghost, Strapi, Payload all need a VPS at ~$6–12/month minimum). Pebble runs entirely on Cloudflare - Workers, D1, and R2 - meaning it deploys globally, scales automatically, and costs nothing on free tiers. A single setup script handles everything end-to-end.
 

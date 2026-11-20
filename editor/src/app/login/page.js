@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useAuth } from "../components/AuthProvider";
+import ThemeToggle from "../components/ThemeToggle";
+import Logo from "../components/Logo";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -40,7 +42,9 @@ export default function LoginPage() {
 
   return (
     <main className="container login-container">
+      <ThemeToggle className="login-theme-toggle" />
       <form onSubmit={handleSubmit} className="login-form">
+        <Logo />
         <input
           type="text"
           value={username}
@@ -56,7 +60,7 @@ export default function LoginPage() {
           required
         />
         <button type="submit" className="publish-btn" disabled={loading}>
-          {loading ? "Logging in..." : "Log in"}
+          {loading ? "Logging in…" : "Log in"}
         </button>
         {error && <p className="error-message">{error}</p>}
       </form>

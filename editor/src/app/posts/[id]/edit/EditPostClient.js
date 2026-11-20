@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import PostEditor from "../../../components/PostEditor";
+import ThemeToggle from "../../../components/ThemeToggle";
 import { useAuth } from "../../../components/AuthProvider";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -33,8 +34,17 @@ export default function EditPostClient() {
   return (
     <main className="container">
       <div className="page-header">
-        <Link href="/" className="back-link">&larr; Back to posts</Link>
-        <h1>Edit Post</h1>
+        <div className="page-header-row">
+          <Link href="/" className="back-link">&larr; Back to posts</Link>
+          <ThemeToggle />
+        </div>
+        <h1>
+          Edit post
+          <span className={`badge ${post.status === "published" ? "published" : "draft"}`}>
+            {post.status === "published" ? "Published" : "Draft"}
+          </span>
+          {post.private && <span className="badge private">Private</span>}
+        </h1>
       </div>
       <PostEditor post={post} />
     </main>

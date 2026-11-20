@@ -59,68 +59,80 @@ export default function PostList() {
     }
   }
 
-  if (loading) return <p>Loading posts...</p>;
+  if (loading) return <p className="loading label">Loading posts…</p>;
 
   if (posts.length === 0 && page === 1) {
-    return <p>No posts yet. Create your first one!</p>;
+    return <p className="empty-state">No posts yet. Create your first one!</p>;
   }
 
   return (
     <div>
       <div className="post-table-wrapper">
-      <table className="post-table">
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Author</th>
-            <th>Status</th>
-            <th>Tags</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {posts.map((post) => (
-            <tr key={post.id}>
-              <td>{post.title}</td>
-              <td>{post.author || "—"}</td>
-              <td>
-                <span className={`status-badge ${post.status}`}>
-                  {post.status}
-                </span>
-                {post.private && (
-                  <span className="status-badge private">private</span>
-                )}
-              </td>
-              <td>
-                <div className="tag-list">
-                  {(post.tags || []).map((tag) => (
-                    <span key={tag} className="tag">{tag}</span>
-                  ))}
-                </div>
-              </td>
-              <td>{new Date(post.created_at + "Z").toLocaleDateString()}</td>
-              <td>
-                <div className="table-actions">
-                  <Link href={`/posts/${post.id}/edit`}>Edit</Link>
-                  <button
-                    className="status-toggle-btn"
-                    onClick={() => toggleStatus(post.id, post.status)}
-                  >
-                    {post.status === "published" ? "Unpublish" : "Publish"}
-                  </button>
-                  <button
-                    className="delete-btn"
-                    onClick={() => deletePost(post.id, post.title)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </td>
+        <table className="post-table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Author</th>
+              <th>Status</th>
+              <th>Tags</th>
+              <th>Created</th>
+              <th className="col-actions">
+                <span className="visually-hidden">Actions</span>
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {posts.map((post) => {
+              const published = post.status === "published";
+              return (
+                <tr key={post.id}>
+                  <td className="col-title">
+                    <Link href={`/posts/${post.id}/edit`}>{post.title}</Link>
+                  </td>
+                  <td className="col-author">
+                    {/* One line, truncated; the full name shows on hover */}
+                    <span title={post.author || undefined}>{post.author || "—"}</span>
+                  </td>
+                  <td className="col-status">
+                    <span className="badges">
+                      <span className={`badge ${published ? "published" : "draft"}`}>
+                        {published ? "Published" : "Draft"}
+                      </span>
+                      {post.private && <span className="badge private">Private</span>}
+                    </span>
+                  </td>
+                  <td className="col-tags">
+                    <div className="tag-list">
+                      {(post.tags || []).map((tag) => (
+                        <span key={tag} className="tag">{tag}</span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="col-date">{formatDate(post.created_at)}</td>
+                  <td className="col-actions">
+                    <div className="table-actions">
+                      <Link href={`/posts/${post.id}/edit`} className="button small edit-btn">
+                        Edit
+                      </Link>
+                      <button
+                        className={`small toggle-btn ${published ? "" : "publish-outline-btn"}`}
+                        onClick={() => toggleStatus(post.id, post.status)}
+                      >
+                        {published ? "Unpublish" : "Publish"}
+                      </button>
+                      <button
+                        className="small delete-btn"
+                        onClick={() => deletePost(post.id, post.title)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       {pagination && pagination.pages > 1 && (
@@ -138,4 +150,13 @@ export default function PostList() {
       )}
     </div>
   );
+}
+
+// "Oct 6, 2026" rather than 10/6/2026, which reads as June 10 in much of the world
+function formatDate(createdAt) {
+  return new Date(createdAt + "Z").toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }

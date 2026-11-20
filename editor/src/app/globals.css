@@ -1,25 +1,169 @@
+/* Pebble editor, built on abhi.work's V3 base: flat (no shadows or
+   gradients), with the site's dotted line kept only for separators (table rows,
+   section dividers). Controls are softly rounded (6px, 4px for small ones) with
+   pale solid borders, so a form reads as one calm surface and emphasis goes to
+   the focused field (blue) and the colored actions.
+
+   Two themes, set by data-theme on <html>: light (the default, whatever the
+   OS says, because existing users know a light UI) and dark (opt-in from the
+   toggle, remembered in localStorage). Both share every rule below; only the
+   color tokens change.
+
+   Two deliberate departures, because this is a tool, not a portfolio.
+
+   Color. The site is grayscale because the photos supply the color and nobody
+   is making decisions there. Here color does a job: it answers "what state is
+   this in?" and "what will this button do?" at a glance. It's used only for
+   meaning, always the same way: blue = the main action, focus and selection;
+   green = published / succeeded; amber = private / needs attention;
+   red = delete / failed.
+
+   Type. The site's Akzidenz Extended and
+   bold-italic headlines are an artistic choice for a portfolio you look at;
+   Pebble is a tool you read and type in, so it uses one plain, readable family
+   in real weights. Nimbus Sans is the site's own Helvetica-style face, which
+   keeps the family resemblance.
+
+   The font files in /fonts are patched copies. As shipped, Nimbus Sans L puts
+   all its spare vertical room below the baseline (ascent 729 = cap height,
+   descent 271), so text sits 2-5px high in every tag, button and field. CSS
+   ascent-override can't fix that everywhere because Safari ignores it, so the
+   metrics are rebalanced inside the files instead (see scripts/fix-font-metrics.py). */
+
+@font-face {
+  font-family: "Nimbus Sans";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url(/fonts/NimbusSanL-Reg.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Nimbus Sans";
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+  src: url(/fonts/NimbusSanL-RegIta.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Nimbus Sans";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url(/fonts/NimbusSanL-Bol.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Nimbus Sans";
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+  src: url(/fonts/NimbusSanL-BolIta.woff2) format("woff2");
+}
+
+/* Shared tokens */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --border: #e5e5e5;
-  --accent: #0070f3;
-  --accent-hover: #0060d0;
-  --success: #0a8f2c;
-  --muted: #666;
+  /* Quick, not the site's slow 0.7s: a tool should answer a click at once */
+  --fade: 0.15s;
+  --on-blue: #fff;
+
+  /* Corner radius: one scale. Rows and dividers stay square. */
+  --radius: 6px;        /* buttons, fields, the writing area */
+  --radius-sm: 4px;     /* tags, toolbar and small buttons, code blocks */
+
+  --font-sans: "Nimbus Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
 }
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
+/* Light: the default */
+:root,
+:root[data-theme="light"] {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --text: #171717;
+  --muted: rgba(23, 23, 23, 0.7);
+  /* 0.62: placeholders and tags still need 4.5:1, even on the neutral tint */
+  --faint: rgba(23, 23, 23, 0.62);
+  --line: 1px dotted rgba(0, 0, 0, 0.5);
+  --rule: 1px dotted rgba(0, 0, 0, 0.2);
+  --hover: rgba(0, 0, 0, 0.05);
+  --row-dot-strong: rgba(0, 0, 0, 0.5);
+  --row-dot: rgba(0, 0, 0, 0.2);
+  --row-hover: rgba(0, 0, 0, 0.025);
+  /* Fields: white on the off-white page with a very pale border. The fill
+     carries most of the shape, so the border can stay quiet. */
+  --field-bg: #ffffff;
+  --field-line: #dcdcdc;
+  --card-bg: #f2f2f2;
+  /* Neutral buttons */
+  --control-bg: #ffffff;
+  --control-line: #d4d4d4;
+  --control-line-hover: #b8b8b8;
+
+  /* Meaning colors on light. Each hue does two jobs: text uses a mid shade
+     (dark enough to read, bright enough not to look black), while fills and
+     borders use the vivid shade so the color registers at a glance. Fills stay
+     light (7-8%) so the text on them still passes 4.5:1. */
+  --blue: #2563eb;
+  --blue-hover: #1d4ed8;
+  --blue-text: #2563eb;
+  --green: #15803d;                       /* 4.8:1 on bg, 4.5:1 on its tint */
+  --green-bg: rgba(34, 197, 94, 0.07);
+  --green-line: rgba(34, 197, 94, 0.75);
+  --amber: #b45309;                       /* 4.8:1 on bg, 4.5:1 on its tint */
+  --amber-bg: rgba(245, 158, 11, 0.08);
+  --amber-line: rgba(245, 158, 11, 0.85);
+  --red: #dc2626;                         /* 4.6:1 on bg */
+  --red-bg: rgba(239, 68, 68, 0.07);
+  --red-line: rgba(239, 68, 68, 0.7);
+  --neutral-bg: rgba(0, 0, 0, 0.05);
+  --neutral-line: rgba(0, 0, 0, 0.25);
+  /* Topic tags: indigo, as before the redesign (7.4:1) */
+  --indigo: #4338ca;
+  --indigo-bg: #eef2ff;
+
+  color-scheme: light;
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Dark: opt-in */
+:root[data-theme="dark"] {
+  --bg: #0e0e0e;
+  --surface: #161616;
+  --text: #f2f2f2;
+  --muted: rgba(242, 242, 242, 0.62);
+  /* 0.5, not the site's 0.4: placeholders and tags need 4.5:1 on the background */
+  --faint: rgba(242, 242, 242, 0.5);
+  --line: 1px dotted rgba(255, 255, 255, 0.55);
+  --rule: 1px dotted rgba(255, 255, 255, 0.22);
+  --hover: rgba(255, 255, 255, 0.08);
+  --row-dot-strong: rgba(255, 255, 255, 0.55);
+  --row-dot: rgba(255, 255, 255, 0.22);
+  --row-hover: rgba(255, 255, 255, 0.03);
+  /* Fields: slightly lifted from the page with a faint border */
+  --field-bg: #1a1a1a;
+  --field-line: rgba(255, 255, 255, 0.14);
+  --card-bg: #131313;
+  --control-bg: transparent;
+  --control-line: rgba(255, 255, 255, 0.22);
+  --control-line-hover: rgba(255, 255, 255, 0.4);
+
+  /* Meaning colors, tuned for the dark background (all text pairs pass 4.5:1) */
+  --blue: #2563eb;
+  --blue-hover: #3b74f0;
+  --blue-text: #8db4ff;
+  --green: #4ade80;
+  --green-bg: rgba(74, 222, 128, 0.12);
+  --green-line: rgba(74, 222, 128, 0.4);
+  --amber: #fbbf24;
+  --amber-bg: rgba(251, 191, 36, 0.12);
+  --amber-line: rgba(251, 191, 36, 0.4);
+  --red: #f87171;
+  --red-bg: rgba(248, 113, 113, 0.12);
+  --red-line: rgba(248, 113, 113, 0.5);
+  --neutral-bg: rgba(255, 255, 255, 0.08);
+  --neutral-line: rgba(255, 255, 255, 0.25);
+  --indigo: #a5b4fc;
+  --indigo-bg: rgba(99, 102, 241, 0.18);
+
+  color-scheme: dark;
 }
 
 * {
@@ -28,547 +172,937 @@ body {
   margin: 0;
 }
 
+/* clip, not hidden: hidden on both html and body makes body a scroll
+   container, which breaks position: sticky and scroll behaviour */
+html,
+body {
+  max-width: 100vw;
+  overflow-x: clip;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* V2's page entrance */
+  animation: appear 1.2s both;
+}
+
+@keyframes appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 a {
-  color: var(--accent);
-  text-decoration: none;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--faint);
+  text-underline-offset: 4px;
+  transition: color var(--fade), text-decoration-color var(--fade);
 }
 a:hover {
-  text-decoration: underline;
+  text-decoration-color: var(--text);
+}
+
+::selection {
+  background: var(--text);
+  color: var(--bg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--blue-text);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Spaced capitals: the interface layer (labels, meta lines, status) */
+/* Interface text is in sentence case ("Preview text", not "PREVIEW TEXT"):
+   easier to read and friendlier for a client-facing tool. Without capitals to
+   set them apart, field labels get a little size and weight instead. */
+.label,
+.page-info {
+  font-size: 13px;
+  color: var(--muted);
+}
+.field-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.section-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.post-table th {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.back-link {
+  font-size: 14px;
+  color: var(--muted);
 }
 
 /* Layout */
+
 .container {
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
+  padding: 32px 40px 80px;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
 }
 
+.sep {
+  margin: 0 0.6em;
+  color: var(--faint);
+}
+/* Status tags: one color per state, the same everywhere */
+.badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  /* Whole-pixel line height: a fractional one (1.3 x 12px) rounds unevenly
+     and nudges the text up */
+  padding: 4px 8px;
+  border: 1px solid var(--neutral-line);
+  border-radius: var(--radius-sm);
+  background: var(--neutral-bg);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  line-height: 14px;
+  white-space: nowrap;
+}
+.badge.published {
+  border-color: var(--green-line);
+  background: var(--green-bg);
+  color: var(--green);
+}
+.badge.private {
+  border-color: var(--amber-line);
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+.page-header h1 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* The tool's name (the Logo component sets it in lowercase) */
+.header h1,
+.login-form h1 {
+  font-weight: 700;
+  line-height: 1;
+}
 .header h1 {
-  font-size: 1.5rem;
+  font-size: 22px;
 }
 
-/* Buttons */
-button {
-  cursor: pointer;
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--background);
-  font-size: 0.875rem;
-  transition: background 0.15s;
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
 }
-button:hover {
-  background: #f5f5f5;
+
+/* Buttons. Roles are told apart by color before you read the label:
+   primary (solid blue), neutral (pale outline), destructive (red), plus the
+   status-changing colors further down. */
+
+button,
+.button,
+.new-post-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border: 1px solid var(--control-line);
+  border-radius: var(--radius);
+  background: var(--control-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--fade), color var(--fade), border-color var(--fade), opacity var(--fade);
+}
+button:hover,
+.button:hover,
+.new-post-btn:hover {
+  background: var(--hover);
+  border-color: var(--control-line-hover);
 }
 button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  opacity: 0.45;
+  cursor: default;
+}
+button:disabled:hover {
+  background: transparent;
 }
 
-.new-post-btn {
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  background: var(--accent);
-  color: #fff;
-  border-radius: 6px;
-  font-size: 0.875rem;
-}
-.new-post-btn:hover {
-  background: var(--accent-hover);
-  text-decoration: none;
-}
-
+/* The main action on each screen */
+.new-post-btn,
 .publish-btn {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
+  background: var(--blue);
+  border: 1px solid var(--blue);
+  color: var(--on-blue);
 }
-.publish-btn:hover {
-  background: var(--accent-hover);
+.new-post-btn:hover,
+.publish-btn:hover,
+.publish-btn:disabled:hover {
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
+}
+
+/* Destructive: red, so it never looks like the other buttons */
+.delete-btn {
+  border: 1px solid var(--red-line);
+  color: var(--red);
+}
+.delete-btn:hover {
+  background: var(--red-bg);
+  border-color: var(--red);
+}
+
+/* Action colors follow one rule. Each status has a color (Published green,
+   Draft gray, Private amber). An action that changes status takes the color of
+   the status it produces: Publish is green, Unpublish and Save draft are gray
+   (they make a draft). Actions that don't change status: blue opens or is the
+   main action (Edit, New post, Update), red deletes. Amber is never a button;
+   it only flags things that need attention (Private, undeployed changes). */
+.edit-btn,
+.publish-outline-btn {
+  border-style: solid;
+}
+.edit-btn {
+  border-color: color-mix(in srgb, var(--blue-text) 60%, transparent);
+  color: var(--blue-text);
+}
+.edit-btn:hover {
+  border-color: var(--blue-text);
+  background: color-mix(in srgb, var(--blue-text) 10%, transparent);
+}
+.publish-outline-btn {
+  border-color: var(--green-line);
+  color: var(--green);
+}
+.publish-outline-btn:hover {
+  border-color: var(--green);
+  background: var(--green-bg);
+}
+
+/* Small buttons in table rows and beside fields */
+.small,
+.private-slug-btn {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+/* A bare text action (e.g. Remove image) */
+.text-btn {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-decoration-color: var(--faint);
+  text-underline-offset: 4px;
+}
+.text-btn:hover {
+  background: none;
+  color: var(--text);
+}
+
+/* Square icon button (the theme toggle): same pale outline as the other
+   neutral buttons, sized to match the header buttons beside it */
+.icon-btn {
+  width: 39px;
+  height: 39px;
+  padding: 0;
+  color: var(--muted);
+}
+.icon-btn:hover {
+  color: var(--text);
+}
+.page-header-row .icon-btn {
+  width: 32px;
+  height: 32px;
 }
 
 /* Post table */
+
 .post-table-wrapper {
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
-
 .post-table {
   width: 100%;
-  min-width: 600px;
   border-collapse: collapse;
 }
 .post-table th,
 .post-table td {
   text-align: left;
-  padding: 0.75rem 0.5rem;
-  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  padding: 14px 20px 14px 0;
+}
+/* Row lines are a repeating 1px-dot / 1px-gap background on the whole row.
+   A dotted border is painted cell by cell, even when set on the row, so the
+   pattern restarts at each column edge and shows a doubled, heavier dot there. */
+.post-table thead tr,
+.post-table tbody tr {
+  background-image: linear-gradient(to right, var(--row-color) 50%, transparent 50%);
+  background-size: 2px 1px;
+  background-repeat: repeat-x;
+  background-position: left bottom;
+}
+.post-table thead tr {
+  --row-color: var(--row-dot-strong);
+}
+.post-table tbody tr {
+  --row-color: var(--row-dot);
 }
 .post-table th {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+  padding-top: 0;
+  padding-bottom: 10px;
+  font-weight: 400;
+  white-space: nowrap;
 }
-
-.status-badge {
-  font-size: 0.75rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 9999px;
+.post-table th:last-child,
+.post-table td:last-child {
+  padding-right: 0;
 }
-.status-badge.draft {
-  background: #f0f0f0;
-  color: var(--muted);
+.post-table tbody tr {
+  transition: background-color var(--fade);
 }
-.status-badge.published {
-  background: #e6f4ea;
-  color: var(--success);
+.post-table tbody tr:hover {
+  background-color: var(--row-hover);
 }
-.status-badge.private {
-  margin-left: 0.3rem;
-  background: #fdf1dc;
-  color: #8a5a00;
+.col-title {
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.3;
+  min-width: 220px;
 }
-
-/* Post editor */
-.post-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.title-input {
-  width: 100%;
-  padding: 0.75rem;
-  font-size: 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  outline: none;
-}
-.title-input:focus {
-  border-color: var(--accent);
-}
-
-.subtitle-input,
-.author-input,
-.preview-input {
-  width: 100%;
-  padding: 0.6rem 0.75rem;
-  font-size: 0.95rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  outline: none;
-  margin-top: 0.5rem;
-}
-.preview-input {
-  font-family: inherit;
-  resize: vertical;
-}
-.subtitle-input:focus,
-.author-input:focus,
-.preview-input:focus {
-  border-color: var(--accent);
-}
-
-.editor-mode-toggle {
-  display: flex;
-  gap: 0.25rem;
-  margin-bottom: 0.5rem;
-}
-.editor-mode-toggle button {
-  padding: 0.3rem 0.75rem;
-  font-size: 0.75rem;
-  border: 1px solid var(--border);
-  background: none;
-  color: var(--muted);
-  border-radius: 6px;
-}
-.editor-mode-toggle button.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-.editor-mode-toggle button:disabled {
-  cursor: default;
-}
-.editor-mode-toggle button:disabled:not(.active) {
-  opacity: 0.45;
-}
-.mode-locked-note {
-  align-self: center;
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.html-editor {
-  width: 100%;
-  min-height: 300px;
-  padding: 1rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-  font-size: 0.85rem;
-  line-height: 1.5;
-  resize: vertical;
-  tab-size: 2;
-}
-.html-editor:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.toolbar {
-  display: flex;
-  gap: 0;
-  padding: 0.25rem;
-  justify-content: space-around;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: #fafafa;
-}
-.toolbar button {
-  padding: 0.25rem 0.4rem;
-  font-size: 0.75rem;
-  border: none;
-  background: none;
-  border-radius: 4px;
-}
-.toolbar button:hover {
-  background: #e5e5e5;
-}
-.toolbar button.active {
-  background: var(--accent);
-  color: #fff;
-}
-
-.editor-content {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  min-height: 300px;
-}
-.editor-content .tiptap {
-  padding: 1rem;
-  min-height: 300px;
-  outline: none;
-}
-.editor-content .tiptap h2 {
-  font-size: 1.25rem;
-  margin: 1rem 0 0.5rem;
-}
-.editor-content .tiptap h3 {
-  font-size: 1.1rem;
-  margin: 0.75rem 0 0.5rem;
-}
-.editor-content .tiptap p {
-  margin: 0.5rem 0;
-}
-.editor-content .tiptap ul {
-  padding-left: 1.5rem;
-  margin: 0.5rem 0;
-}
-.editor-content .tiptap blockquote {
-  border-left: 3px solid var(--border);
-  padding-left: 1rem;
-  color: var(--muted);
-  margin: 0.5rem 0;
-}
-.editor-content .tiptap img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 6px;
-  margin: 0.75rem 0;
-}
-
-.editor-content .tiptap pre {
-  background: #f5f5f5;
-  padding: 0.75rem;
-  border-radius: 4px;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 0.875rem;
-  overflow-x: auto;
-  margin: 0.5rem 0;
-}
-
-.actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.message {
-  padding: 0.75rem;
-  background: #f0f9ff;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  color: var(--accent);
-}
-
-/* Login page */
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  padding: 1rem;
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  width: 100%;
-  max-width: 360px;
-}
-
-.login-form h1 {
-  font-size: 1.5rem;
-  text-align: center;
-  margin-bottom: 0.5rem;
-}
-
-.login-form input {
-  padding: 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 0.875rem;
-  outline: none;
-}
-
-.login-form input:focus {
-  border-color: var(--accent);
-}
-
-.error-message {
-  color: #dc2626;
-  font-size: 0.875rem;
-  text-align: center;
-}
-
-/* Header actions */
-.header-actions {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.logout-btn {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 0.8rem;
-  padding: 0.4rem 0.75rem;
-}
-.logout-btn:hover {
-  color: var(--foreground);
-}
-
-/* Rebuild control */
-.rebuild-control {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.rebuild-btn {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--foreground);
-  font-size: 0.8rem;
-  padding: 0.4rem 0.75rem;
-}
-.rebuild-btn:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.rebuild-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-.build-status {
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-.build-status.building,
-.build-status.queued,
-.build-status.initializing {
-  color: var(--accent);
-}
-.build-status.ready {
-  color: var(--success);
-}
-.build-status.error,
-.build-status.canceled {
-  color: #d33;
-}
-.build-status.dirty {
-  color: #d97706;
-}
-
-/* Page header with back link */
-.page-header {
-  margin-bottom: 1.5rem;
-}
-.page-header h1 {
-  font-size: 1.5rem;
-}
-.back-link {
-  display: inline-block;
-  margin-bottom: 0.75rem;
-  font-size: 0.875rem;
-  color: var(--muted);
-}
-.back-link:hover {
-  color: var(--foreground);
+.col-title a {
   text-decoration: none;
 }
-
-/* Tags */
+.col-title a:hover {
+  text-decoration: underline;
+}
+/* Author on one line, cut off with "…"; the full name is in the tooltip */
+.col-author span {
+  display: block;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+/* Fixed width so a longer date can't push the buttons out of line */
+.col-date {
+  width: 120px;
+  min-width: 120px;
+  white-space: nowrap;
+  color: var(--muted);
+}
+/* Status tags sit side by side, never stacked */
+.col-status .badges {
+  flex-wrap: nowrap;
+}
+.col-tags {
+  min-width: 200px;
+  max-width: 280px;
+}
 .tag-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  gap: 4px;
 }
 .tag {
-  font-size: 0.7rem;
-  padding: 0.15rem 0.4rem;
-  background: #eef2ff;
-  color: #4338ca;
-  border-radius: 4px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--indigo-bg);
+  color: var(--indigo);
+  font-size: 12px;
+  white-space: nowrap;
 }
-
-/* Table actions */
+.col-actions {
+  text-align: right;
+}
 .table-actions {
   display: flex;
-  gap: 0.5rem;
-  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
 }
-.status-toggle-btn {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--border);
-  background: none;
-}
-.delete-btn {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid #fecaca;
-  background: #fef2f2;
-  color: #dc2626;
-}
-.delete-btn:hover {
-  background: #fee2e2;
+/* Publish and Unpublish get the same width, so Edit lines up in every row */
+.table-actions .toggle-btn {
+  min-width: 88px;
 }
 
-/* Pagination */
 .pagination {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
+  gap: 16px;
+  margin-top: 32px;
 }
-.page-info {
-  font-size: 0.875rem;
+
+.empty-state,
+.loading {
+  padding: 48px 0;
   color: var(--muted);
 }
 
-/* Editor metadata fields */
-.editor-meta {
+/* Page header with back link */
+
+/* The screen's name ("New post" / "Edit post") is a real heading: it tells you
+   which screen you're on, since the two are otherwise identical, and carries the
+   post's status tags. 28px: clearly the page title, one step above the title
+   field (22px), which is a field inside the form. */
+.page-header {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: #fafafa;
+  gap: 16px;
+  margin-bottom: 32px;
 }
-.editor-meta label {
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+}
+.page-header h1 .badge {
+  /* tags stay their own size beside the big heading */
+  font-size: 12px;
+}
+.page-header-row {
   display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--muted);
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
 }
+.back-link {
+  align-self: flex-start;
+  text-decoration: none;
+}
+.back-link:hover {
+  color: var(--text);
+}
+
+/* Fields: pale border, blue on focus */
+
+input[type="text"],
+input[type="password"],
+textarea,
+.title-input,
 .meta-input {
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 0.875rem;
+  padding: 10px 12px;
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius);
+  background: var(--field-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
   outline: none;
-  font-family: inherit;
+  transition: border-color var(--fade);
 }
-.meta-input:focus {
-  border-color: var(--accent);
+input::placeholder,
+textarea::placeholder {
+  color: var(--faint);
 }
-.meta-textarea {
-  min-height: 60px;
+input[type="text"]:focus,
+input[type="password"]:focus,
+textarea:focus {
+  border: 1px solid var(--blue-text);
+  outline: none;
+}
+textarea {
   resize: vertical;
 }
-.field-hint {
-  font-size: 0.72rem;
-  font-weight: 400;
-  color: var(--muted);
-  opacity: 0.8;
-  word-break: break-all;
+
+/* Post editor */
+
+/* One spacing scale for the editor: 24px between every main block (title,
+   subtitle, body, the optional card, the buttons), 20px between fields inside
+   the card (tighter, since they're one group), 32px from the page heading.
+   Blocks get no margins of their own, so the gap is the only spacing. */
+.post-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
+
+/* Every field keeps a visible label above it; placeholders vanish once typed in */
+.field-label,
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Field text is regular weight; only the label above it is bold */
+.field-label input,
+.field-label textarea {
+  font-weight: 400;
+  color: var(--text);
+}
+/* Toolbar on the left, Rich Text / HTML switch pushed to the right */
+.body-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* The title field reads as the headline it will become */
+/* The title field grows onto more lines so a long title is always fully
+   visible (PostEditor sizes it to its text) */
+.post-editor .title-input {
+  display: block;
+  padding: 12px 14px;
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.25;
+  resize: none;
+  overflow: hidden;
+}
+
+.post-editor .subtitle-input {
+  font-size: 17px;
+}
+
 .slug-field {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  margin-top: 0.5rem;
+  gap: 6px;
 }
 .slug-input-wrap {
   display: flex;
   align-items: center;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding-left: 0.75rem;
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius);
+  background: var(--field-bg);
+  padding-left: 12px;
+  transition: border-color var(--fade);
 }
 .slug-input-wrap:focus-within {
-  border-color: var(--accent);
+  border: 1px solid var(--blue-text);
 }
 .slug-prefix {
-  color: var(--muted);
-  font-size: 0.95rem;
+  color: var(--faint);
   user-select: none;
 }
-.slug-input {
+.slug-input-wrap .slug-input {
   flex: 1;
-  padding: 0.6rem 0.75rem 0.6rem 0.15rem;
-  font-size: 0.95rem;
+  padding-left: 2px;
   border: none;
+  border-radius: 0;
   background: none;
-  outline: none;
-  color: inherit;
+}
+
+.field-hint {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+/* Checkbox: pale box, fills blue when checked */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--control-line-hover);
+  border-radius: 3px;
+  background: var(--field-bg);
+  cursor: pointer;
+  transition: background-color var(--fade), border-color var(--fade);
+}
+input[type="checkbox"]:checked {
+  background: var(--blue);
+  border: 1px solid var(--blue);
 }
 
 .private-field {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.3rem;
+  gap: 8px;
+  padding: 4px 0;
 }
-
 .private-toggle {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.85rem;
+  gap: 10px;
   cursor: pointer;
 }
 
-.private-slug-btn {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.6rem;
-  cursor: pointer;
+/* Segmented controls: rich/HTML switch and the formatting toolbar.
+   The selected one turns blue, the selection color. */
+
+.body-bar .editor-mode-toggle {
+  margin-left: auto;
+}
+.editor-mode-toggle,
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.editor-mode-toggle button,
+.toolbar button {
+  padding: 7px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.editor-mode-toggle button.active,
+.toolbar button.active {
+  background: var(--blue);
+  border: 1px solid var(--blue);
+  color: var(--on-blue);
+}
+
+/* Bold and italic buttons show what they do */
+.toolbar button.tb-bold {
+  font-weight: 700;
+}
+.toolbar button.tb-italic {
+  font-style: italic;
+}
+
+/* Writing surface */
+
+.editor-content {
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius);
+  background: var(--field-bg);
+  min-height: 360px;
+  transition: border-color var(--fade);
+}
+.editor-content:focus-within {
+  border: 1px solid var(--blue-text);
+}
+.editor-content .tiptap {
+  padding: 20px 22px;
+  min-height: 360px;
+  outline: none;
+  font-size: 17px;
+  line-height: 1.65;
+}
+.editor-content .tiptap > * + * {
+  margin-top: 0.75em;
+}
+.editor-content .tiptap h2,
+.editor-content .tiptap h3 {
+  font-weight: 700;
+  line-height: 1.2;
+  margin-top: 1.4em;
+}
+.editor-content .tiptap h2 {
+  font-size: 24px;
+}
+.editor-content .tiptap h3 {
+  font-size: 19px;
+}
+.editor-content .tiptap ul,
+.editor-content .tiptap ol {
+  padding-left: 1.4em;
+}
+.editor-content .tiptap blockquote {
+  border-left: var(--line);
+  padding-left: 1em;
+  color: var(--muted);
+}
+.editor-content .tiptap img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.editor-content .tiptap img.ProseMirror-selectednode {
+  outline: 1px dotted var(--text);
+  outline-offset: 3px;
+}
+.editor-content .tiptap code {
+  font-family: var(--font-mono);
+  font-weight: normal;
+  font-size: 0.88em;
+}
+.editor-content .tiptap pre {
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+}
+/* Code gets its own tighter spacing. It's set on the pre itself: a block's line
+   height comes from the block, so setting it only on the inner code does nothing
+   while the pre still inherits the body text's 1.65 at 17px. */
+.editor-content .tiptap pre {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.editor-content .tiptap pre code {
+  font-size: inherit;
+}
+.editor-content .tiptap hr {
+  border: none;
+  border-top: var(--line);
+}
+
+.html-editor {
+  min-height: 360px;
+  padding: 16px;
+  font-family: var(--font-mono);
+  font-weight: normal;
+  font-size: 13px;
+  line-height: 1.55;
+  tab-size: 2;
+}
+
+/* Settings: the behind-the-scenes optional fields (URL, private, tags, search
+   description, header image), grouped in one card so the page reads as "the
+   post, then a box of extras" rather than ten fields to fill in. Fields readers
+   see on the site (author, preview text) stay above with the post. A slightly darker fill than the page lets the white
+   fields inside stand out; flat, no shadow. */
+
+.editor-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+}
+.section-hint {
+  margin-left: 8px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.meta-textarea {
+  min-height: 72px;
+}
+
+.og-image-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.og-preview {
+  display: block;
+  max-height: 140px;
+  max-width: 100%;
+}
+
+/* Save and publish buttons: at the end of the page, not pinned. A pinned bar
+   made the top of the page look finished, hiding the fields further down. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+/* Delete sits apart from the save actions so it isn't hit by mistake */
+.actions .delete-btn {
+  margin-left: auto;
+}
+
+.message {
+  margin-left: 8px;
+  color: var(--muted);
+}
+.message.success {
+  color: var(--green);
+}
+.message.error {
+  color: var(--red);
+}
+
+/* Login */
+
+.login-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 340px;
+}
+.login-form h1 {
+  font-size: 32px;
+  margin-bottom: 16px;
+}
+.login-form button {
+  margin-top: 8px;
+}
+/* Theme switch tucked into the corner, out of the way of signing in */
+.login-theme-toggle {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+}
+.error-message {
+  color: var(--red);
+  font-size: 13px;
+}
+
+/* Rebuild control */
+
+.rebuild-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.build-status {
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.build-status.ready {
+  color: var(--green);
+}
+.build-status.dirty {
+  color: var(--amber);
+}
+.build-status.queued,
+.build-status.initializing,
+.build-status.building {
+  color: var(--blue-text);
+  animation: breathe 1.6s ease-in-out infinite alternate;
+}
+.build-status.error,
+.build-status.canceled {
+  color: var(--red);
+}
+@keyframes breathe {
+  from { opacity: 1; }
+  to { opacity: 0.35; }
+}
+
+/* Phones: 16px gutter, as on the site */
+
+@media (max-width: 700px) {
+  .container {
+    padding: 20px 16px 64px;
+  }
+  .header {
+    margin-bottom: 28px;
+  }
+  .editor-meta {
+    padding: 16px;
+  }
+  .page-header h1 {
+    font-size: 24px;
+  }
+  .post-editor .title-input {
+    font-size: 20px;
+  }
+  /* The table becomes one block per post: title, then author, status, date
+     and tags on wrapping lines, then the buttons */
+  .post-table thead {
+    display: none;
+  }
+  .post-table,
+  .post-table tbody,
+  .post-table tr,
+  .post-table td {
+    display: block;
+  }
+  /* Each row is a plain block here, so an ordinary dotted border is uniform */
+  .post-table tr {
+    padding: 16px 0;
+    border-bottom: var(--rule);
+    background-image: none;
+  }
+  .post-table td {
+    padding: 0;
+    border: none;
+  }
+  .post-table td + td {
+    margin-top: 8px;
+  }
+  .post-table .col-title {
+    min-width: 0;
+    font-size: 17px;
+  }
+  .col-author span {
+    max-width: 100%;
+  }
+  .col-tags {
+    min-width: 0;
+    max-width: none;
+  }
+  /* No empty gap for a post without tags */
+  .post-table td.col-tags:not(:has(.tag)) {
+    display: none;
+  }
+  .table-actions {
+    justify-content: flex-start;
+  }
+  .post-table tbody tr:hover {
+    background-color: transparent;
+  }
+
+}
+
+/* iOS zooms into any field under 16px when tapped */
+@media (hover: none) and (pointer: coarse) {
+  input[type="text"],
+  input[type="password"],
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body,
+  .build-status {
+    animation: none;
+  }
 }

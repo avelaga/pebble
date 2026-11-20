@@ -1,0 +1,21 @@
+/* The app name: the hand-drawn pebble, then "pebble" in lowercase.
+   The drawing is white on transparent. Light is the default theme (and what a
+   missing data-theme counts as), so it is inverted to black unless dark. */
+.logo.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  text-transform: none;
+}
+
+.mark {
+  display: block;
+  height: 1.35em;
+  width: auto;
+  flex: none;
+  filter: invert(1);
+}
+
+:global([data-theme="dark"]) .mark {
+  filter: none;
+}
